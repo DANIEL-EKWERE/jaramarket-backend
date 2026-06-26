@@ -30,11 +30,61 @@ def vendor_categories(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def categories_all_products(request):
-    out = [{**CategorySerializer(cat).data,
-            "products": ProductSerializer(cat.products.all(), many=True).data}
-           for cat in Category.objects.all().order_by("sort_by")]
-    return success("Categories with products retrieved", out)
+    lga_id   = request.query_params.get("lga_id")
+    state_id = request.query_params.get("state_id")
+    page     = int(request.query_params.get("page", 1))
+    per_page = int(request.query_params.get("per_page", 5))
+
+    qs    = Category.objects.all().order_by("sort_by")
+    total = qs.count()
+    start = (page - 1) * per_page
+    cats  = qs[start: start + per_page]
+
+    def _resolve_product(prod):
+        loc = prod.get_price_for_location(state_id=state_id)
+        is_state_price = loc["price_source"] != "default"
+        ingr_data = []
+        for ip in prod.ingredientproduct_set.select_related("ingredient").all():
+            ing  = ip.ingredient
+            iloc = ing.get_price_for_location(lga_id=lga_id, state_id=state_id)
+            ingr_data.append({
+                "id": ing.id, "name": ing.name, "category_id": ing.category_id,
+                "unit": ing.unit, "stock": ing.stock, "image_url": ing.image_url,
+                "price": str(iloc["price"]),
+                "discounted_price": str(iloc["discounted_price"]) if iloc["discounted_price"] else None,
+                "is_state_price": iloc["price_source"] != "default",
+                "quantity": str(ip.quantity) if ip.quantity else None,
+                "serving_unit": ip.unit,
+            })
+        return {
+            "id": prod.id, "name": prod.name, "description": prod.description,
+            "price": str(loc["price"]),
+            "discount_price": str(loc["discount_price"]) if loc["discount_price"] else None,
+            "is_state_price": is_state_price,
+            "stock": prod.stock, "image_url": prod.image_url,
+            "rating": prod.rating, "preparation_steps": prod.preparation_steps,
+            "ingredients": ingr_data,
+            "created_at": prod.created_at.isoformat() if prod.created_at else None,
+        }
+
+    out = []
+    for cat in cats:
+        products = list(cat.products.prefetch_related("ingredientproduct_set__ingredient").all())
+        out.append({
+            **CategorySerializer(cat).data,
+            "products": [_resolve_product(p) for p in products],
+        })
+
+    last_page = (total + per_page - 1) // per_page
+    return success("Categories with products retrieved", {
+        "data": out,
+        "current_page": page,
+        "last_page": last_page,
+        "total": total,
+        "per_page": per_page,
+    })
 
 
 @api_view(["GET"])
