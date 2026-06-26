@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
 from api.utils import error, success
 from api.services import UserRegistrationService
@@ -23,6 +24,7 @@ def _paginate(request, qs, serializer_cls):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def vendor_categories(request):
     return success("Vendor categories retrieved", CategorySerializer(Category.objects.all(), many=True).data)
 

@@ -142,6 +142,10 @@ def new_order_notification(vendor_user, order):
     html = new_order_vendor_email(vendor_user.firstname or vendor_user.email,
                                   order.reference, items_count)
     send_email(vendor_user.email, f"New Order #{order.reference} Available", msg, html=html)
+    if vendor_user.phone_number:
+        from .services.sms import Termii
+        Termii().send(vendor_user.phone_number,
+                      f"Jaramarket: New order #{order.reference} is available. Open the app to accept it.")
     return result
 
 

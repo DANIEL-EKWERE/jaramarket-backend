@@ -160,7 +160,7 @@ PAYSTACK_BASE_URL = config("PAYSTACK_BASE_URL", default="https://api.paystack.co
 FLUTTERWAVE_SECRET_KEY = config("FLUTTERWAVE_SECRET_KEY", default="")
 FLUTTERWAVE_BASE_URL = config("FLUTTERWAVE_BASE_URL", default="https://api.flutterwave.com/v3")
 TERMII_API_KEY = config("TERMII_API_KEY", default="")
-TERMII_SENDER_ID = config("TERMII_SENDER_ID", default="Jaraman")
+TERMII_SENDER_ID = config("TERMII_SENDER_ID", default="Jaramarket")
 TERMII_BASE_URL = config("TERMII_BASE_URL", default="https://api.ng.termii.com")
 FIREBASE_CREDENTIALS = config("FIREBASE_CREDENTIALS", default="")
 

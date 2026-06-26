@@ -31,7 +31,7 @@ class UserRegistrationService:
             referrer.referral_count = (referrer.referral_count or 0) + 1
             referrer.save(update_fields=["referral_count"])
         Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
-        self.send_otp(user.email)
+        self.send_otp(user.email, user=user)
         from api.notifications import welcome_notification
         welcome_notification(user)
         return user
@@ -42,11 +42,17 @@ class UserRegistrationService:
             if not User.objects.filter(referral_code=code).exists():
                 return code
 
-    def send_otp(self, email):
+    def send_otp(self, email, user=None):
         otp = f"{random.randint(0, 9999):04d}"
         UserOtp.objects.create(email=email, otp=otp)
         from api.notifications import otp_notification
         otp_notification(email, otp)
+        # Vendors also get OTP via SMS
+        if user is None:
+            user = User.objects.filter(email=email).first()
+        if user and user.role == Roles.VENDOR and user.phone_number:
+            from .sms import Termii
+            Termii().send(user.phone_number, f"Your Jaramarket OTP is {otp}. It expires in 15 minutes.")
         return otp
 
     def validate_otp(self, email, otp):
