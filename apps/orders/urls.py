@@ -6,6 +6,7 @@ urlpatterns = [
     path("orders/<int:order>", v.order_show),
     path("orders/<int:order>/cancel", v.order_cancel),
     path("orders/<int:order>/complete", v.order_mark_completed),
+    path("vendor/dashboard", v.vendor_dashboard),
     path("vendor/orders", v.vendor_available_orders),
     path("vendor/orders/accepted", v.vendor_my_orders),
     path("vendor/orders/<int:item_id>", v.vendor_order_item),

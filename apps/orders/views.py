@@ -106,6 +106,54 @@ def vendor_decide(request, item_id):
     return success("Action taken successfully", IngredientOrderSerializer(item).data)
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated, IsVendor])
+def vendor_dashboard(request):
+    from django.db.models import Sum
+    from django.utils import timezone
+    from datetime import timedelta
+    from apps.finance.models import Wallet
+
+    period = request.query_params.get("period", "all")
+    qs = OrderItem.objects.filter(vendor=request.user)
+
+    if period == "week":
+        qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=7))
+    elif period == "month":
+        qs = qs.filter(created_at__gte=timezone.now() - timedelta(days=30))
+
+    total_orders     = qs.count()
+    pending_orders   = qs.filter(status="pending").count()
+    completed_orders = qs.filter(status="completed").count()
+    cancelled_orders = qs.filter(status="cancelled").count()
+    total_revenue    = qs.filter(status="completed").aggregate(t=Sum("vendor_amount"))["t"] or 0
+
+    wallet = Wallet.objects.filter(user=request.user).first()
+
+    recent = qs.select_related("ingredient", "product", "order__user").order_by("-created_at")[:10]
+    recent_data = [
+        {
+            "id": item.id,
+            "status": item.status,
+            "amount": str(item.amount),
+            "created_at": item.created_at,
+            "customer_name": item.order.user.name if item.order and item.order.user else None,
+        }
+        for item in recent
+    ]
+
+    return success("Vendor dashboard retrieved", {
+        "period": period,
+        "total_orders": total_orders,
+        "pending_orders": pending_orders,
+        "completed_orders": completed_orders,
+        "cancelled_orders": cancelled_orders,
+        "total_revenue": str(total_revenue),
+        "wallet_balance": str(wallet.balance) if wallet else "0.00",
+        "recent_orders": recent_data,
+    })
+
+
 @api_view(["GET", "POST"])
 def settings_view(request):
     if request.method == "GET":
