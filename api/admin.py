@@ -58,6 +58,6 @@ class FCMDeviceAdmin(admin.ModelAdmin):
         return super().get_queryset(request).exclude(fcm_token__isnull=True).exclude(fcm_token="")
 
 
-admin.site.site_header = "Jaramarket Admin"
-admin.site.site_title = "Jaramarket Admin"
+admin.site.site_header = "Jara market Admin"
+admin.site.site_title = "Jara market Admin"
 admin.site.index_title = "Administration"
