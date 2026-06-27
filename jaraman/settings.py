@@ -218,6 +218,7 @@ CELERY_RESULT_SERIALIZER = "json"
 # Enforce Paystack webhook signature unless explicitly disabled (off in DEBUG).
 PAYSTACK_VERIFY_WEBHOOK = config("PAYSTACK_VERIFY_WEBHOOK", default=not DEBUG, cast=bool)
 
+#https://jaramarket-backend.onrender.com/api/jaram/webhook/paystack
 
 # ── Channels (WebSockets) ──
 # In-memory layer needs no broker (single-process). For production use
