@@ -211,14 +211,16 @@ class OrderService:
 
     # ── Vendor ──
     def available_orders(self, vendor):
-        qs = OrderItem.objects.filter(status="pending", ingredient__isnull=False)
+        qs = OrderItem.objects.filter(
+            status="pending", ingredient__isnull=False
+        ).select_related("ingredient", "product", "order__user")
         if vendor.role != Roles.ADMIN:
             cat_ids = list(vendor.categories.values_list("id", flat=True))
             qs = qs.filter(ingredient__category_id__in=cat_ids)
         return qs.order_by("-created_at")
 
     def my_orders(self, vendor):
-        qs = OrderItem.objects.all()
+        qs = OrderItem.objects.select_related("ingredient", "product", "order__user")
         if vendor.role == Roles.ADMIN:
             qs = qs.filter(vendor__isnull=False)
         else:

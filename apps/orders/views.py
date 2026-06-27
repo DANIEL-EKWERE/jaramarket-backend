@@ -5,7 +5,8 @@ from rest_framework import permissions
 from api.utils import error, success
 from api.services import OrderService
 from apps.support.models import Setting
-from .serializers import IngredientOrderSerializer, OrderSerializer
+from .models import OrderItem
+from .serializers import IngredientOrderSerializer, OrderSerializer, VendorOrderItemSerializer
 
 
 def _paginate(request, qs, serializer_cls):
@@ -79,21 +80,23 @@ def order_mark_completed(request, order):
 @permission_classes([IsAuthenticated, IsVendor])
 def vendor_available_orders(request):
     return success("Available orders retrieved successfully",
-                   _paginate(request, _svc.available_orders(request.user), IngredientOrderSerializer))
+                   _paginate(request, _svc.available_orders(request.user), VendorOrderItemSerializer))
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsVendor])
 def vendor_my_orders(request):
     return success("Accepted orders retrieved successfully",
-                   _paginate(request, _svc.my_orders(request.user), IngredientOrderSerializer))
+                   _paginate(request, _svc.my_orders(request.user), VendorOrderItemSerializer))
 
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated, IsVendor])
 def vendor_order_item(request, item_id):
     item = _svc.show_item(item_id)
-    return success("Order retrieved successfully", IngredientOrderSerializer(item).data) if item else error("Order not found", status=404)
+    if not item:
+        return error("Order not found", status=404)
+    return success("Order retrieved successfully", VendorOrderItemSerializer(item).data)
 
 
 @api_view(["POST"])
@@ -103,7 +106,7 @@ def vendor_decide(request, item_id):
         item = _svc.decide(request.user, item_id, request.data)
     except ValueError as e:
         return error(str(e), status=404)
-    return success("Action taken successfully", IngredientOrderSerializer(item).data)
+    return success("Action taken successfully", VendorOrderItemSerializer(item).data)
 
 
 @api_view(["GET"])

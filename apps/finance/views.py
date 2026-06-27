@@ -3,7 +3,8 @@ from rest_framework.permissions import AllowAny
 
 from api.utils import error, success
 from api.services import PaymentGateway, WalletService
-from .models import Bank, PaymentLog
+from api.services._base import USER_TYPE
+from .models import Bank, PaymentLog, TransactionLog
 from .serializers import BankSerializer, TransactionSerializer, TransferSerializer, WalletSerializer
 
 
@@ -109,23 +110,37 @@ def paystack_webhook_v2(request):
 
 @api_view(["GET"])
 def payments_all(request):
-    qs = PaymentLog.objects.filter(
-        transaction_initiator_type="App\\Models\\User",
-        transaction_initiator_id=request.user.id).order_by("-created_at")
+    """
+    Return the user's full wallet transaction history from TransactionLog.
+    Covers every money movement: order payments, wallet funding, withdrawals,
+    refunds, vendor credits, referral bonuses — anything recorded by
+    TransactionLogService.debit / .credit.
+    """
+    qs = TransactionLog.objects.filter(
+        account_owner_type=USER_TYPE,
+        account_owner_id=request.user.id,
+    ).order_by("-created_at")
+
     user_name = request.user.name
+    unit = TransactionLog.SMALLEST_CURRENCY_UNIT  # 100 — amounts stored in kobo-equivalent
+
     data = [
         {
-            "id": p.id,
-            "txn_ref": p.txn_ref or "",
-            "amount": str(round(p.amount / 100, 2)) if p.amount else "0",
-            "status": p.status or "pending",
-            "provider": p.provider or "",
-            "gateway_response": p.gateway_response or "",
-            "transaction_mode": p.transaction_mode or "",
+            "id": t.id,
+            "txn_ref": t.reference or "",
+            "amount": str(round(t.amount / unit, 2)),
+            # Flutter wallet screen checks `status == 'success'` to colour-code
+            # direction: green + for credits, red - for debits.
+            "status": "success" if t.transaction_type == "credit" else "debit",
+            "provider": "wallet",
+            "gateway_response": t.comment or (
+                "Wallet credited" if t.transaction_type == "credit" else "Wallet debited"
+            ),
+            "transaction_mode": t.transaction_type or "",
             "user_name": user_name,
-            "created_at": p.created_at.isoformat() if p.created_at else "",
+            "created_at": t.created_at.isoformat() if t.created_at else "",
         }
-        for p in qs[:50]
+        for t in qs[:100]
     ]
     return success("Transactions retrieved successfully", data)
 

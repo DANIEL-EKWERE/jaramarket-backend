@@ -10,6 +10,28 @@ class IngredientOrderSerializer(serializers.Serializer):
     unit = serializers.CharField(required=False)
 
 
+class VendorOrderItemSerializer(serializers.ModelSerializer):
+    ingredient_name = serializers.CharField(source="ingredient.name", read_only=True, default=None)
+    product_name = serializers.CharField(source="product.name", read_only=True, default=None)
+    order_reference = serializers.CharField(source="order.reference", read_only=True)
+    customer_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = OrderItem
+        fields = [
+            "id", "status", "quantity", "price", "unit", "amount", "vendor_amount",
+            "commision", "ingredient_id", "ingredient_name", "product_id", "product_name",
+            "order_reference", "customer_name", "vendor_id", "vendor_at", "created_at",
+        ]
+
+    def get_customer_name(self, obj):
+        user = obj.order.user if obj.order else None
+        if not user:
+            return None
+        full = f"{user.firstname or ''} {user.lastname or ''}".strip()
+        return full or user.name or user.email
+
+
 class OrderItemSerializer(serializers.ModelSerializer):
     ingredient_name = serializers.CharField(source="ingredient.name", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
