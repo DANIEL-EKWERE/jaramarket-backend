@@ -69,7 +69,8 @@ def fund_wallet(request):
     amount = request.data.get("amount")
     if not amount:
         return error("amount is required", status=422)
-    gateway = PaymentGateway.resolve(request.data.get("gateway"))
+    gateway_name = request.data.get("gateway") or request.data.get("payment_gateway")
+    gateway = PaymentGateway.resolve(gateway_name)
     ref = PaymentGateway.gen_ref("FUND")
     result = gateway.initialize_transaction(
         request.user.email, int(float(amount) * 100), ref,
