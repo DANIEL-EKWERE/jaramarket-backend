@@ -41,11 +41,17 @@ def wallet_transactions(request):
 
 @api_view(["POST"])
 def wallet_transfer(request):
+    from django.contrib.auth.hashers import check_password as _chk
     amount = request.data.get("amount")
     bank_code = request.data.get("bank_code")
     account_number = request.data.get("account_number")
+    pin = request.data.get("pin_token") or request.data.get("pin")
     if not all([amount, bank_code, account_number]):
         return error("amount, bank_code and account_number are required", status=422)
+    if not request.user.pin:
+        return error("Please set a transaction PIN before withdrawing.", status=422)
+    if not pin or not _chk(str(pin), request.user.pin):
+        return error("Invalid transaction PIN.", status=422)
     try:
         result = _wallet_svc.transfer_to_bank(request.user, amount, bank_code, account_number)
     except ValueError as e:
@@ -105,8 +111,21 @@ def payments_all(request):
     qs = PaymentLog.objects.filter(
         transaction_initiator_type="App\\Models\\User",
         transaction_initiator_id=request.user.id).order_by("-created_at")
-    data = [{"id": p.id, "txn_ref": p.txn_ref, "amount": p.amount, "status": p.status,
-             "provider": p.provider, "created_at": p.created_at} for p in qs[:50]]
+    user_name = request.user.name
+    data = [
+        {
+            "id": p.id,
+            "txn_ref": p.txn_ref or "",
+            "amount": str(round(p.amount / 100, 2)) if p.amount else "0",
+            "status": p.status or "pending",
+            "provider": p.provider or "",
+            "gateway_response": p.gateway_response or "",
+            "transaction_mode": p.transaction_mode or "",
+            "user_name": user_name,
+            "created_at": p.created_at.isoformat() if p.created_at else "",
+        }
+        for p in qs[:50]
+    ]
     return success("Transactions retrieved successfully", data)
 
 
