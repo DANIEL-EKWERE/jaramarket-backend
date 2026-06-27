@@ -147,6 +147,8 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
+    # Use a dedicated signing key (min 32 chars for HS256). Falls back to SECRET_KEY.
+    "SIGNING_KEY": config("JWT_SECRET_KEY", default=None) or SECRET_KEY,
 }
 
 # ── CORS ──

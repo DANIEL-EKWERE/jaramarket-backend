@@ -53,12 +53,11 @@ class TransactionLogService:
     def debit(cls, account_owner_id, account_owner_type, amount, owner_id=None,
               owner_type=None, currency="NGN", comment=None):
         amount = _d(amount)
-        wallet = Wallet.objects.filter(user_id=account_owner_id).first()
-        old = _d(wallet.balance) if wallet else Decimal("0")
+        wallet, _ = Wallet.objects.get_or_create(user_id=account_owner_id, defaults={"balance": 0})
+        old = _d(wallet.balance)
         new = old - amount
-        if wallet:
-            wallet.balance = new
-            wallet.save(update_fields=["balance"])
+        wallet.balance = new
+        wallet.save(update_fields=["balance"])
         return TransactionLog.objects.create(
             account_owner_id=account_owner_id, account_owner_type=account_owner_type,
             owner_id=owner_id, owner_type=owner_type,
@@ -73,12 +72,11 @@ class TransactionLogService:
     def credit(cls, account_owner_id, account_owner_type, amount, owner_id=None,
                owner_type=None, currency="NGN", comment=None):
         amount = _d(amount)
-        wallet = Wallet.objects.filter(user_id=account_owner_id).first()
-        old = _d(wallet.balance) if wallet else Decimal("0")
+        wallet, _ = Wallet.objects.get_or_create(user_id=account_owner_id, defaults={"balance": 0})
+        old = _d(wallet.balance)
         new = old + amount
-        if wallet:
-            wallet.balance = new
-            wallet.save(update_fields=["balance"])
+        wallet.balance = new
+        wallet.save(update_fields=["balance"])
         return TransactionLog.objects.create(
             account_owner_id=account_owner_id, account_owner_type=account_owner_type,
             owner_id=owner_id, owner_type=owner_type,
@@ -99,8 +97,8 @@ class OrderService:
     @transaction.atomic
     def create_order(self, user, data):
         total = _d(data.get("total"))
-        wallet = Wallet.objects.filter(user=user).first()
-        if not wallet or _d(wallet.balance) < total:
+        wallet, _ = Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+        if _d(wallet.balance) < total:
             raise ValueError("Insufficient wallet balance.")
 
         address = None
