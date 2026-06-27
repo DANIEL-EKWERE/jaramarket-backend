@@ -152,6 +152,17 @@ SIMPLE_JWT = {
 # ── CORS ──
 CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL", default=True, cast=bool)
 CORS_ALLOW_CREDENTIALS = True
+# Explicit origin allowlist (used when CORS_ALLOW_ALL_ORIGINS is False)
+CORS_ALLOWED_ORIGINS = config(
+    "CORS_ALLOWED_ORIGINS",
+    default="http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000",
+    cast=Csv(),
+)
+# Always allow any localhost port (Flutter web dev servers use random ports)
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+]
 
 # ── Third-party integrations (mirror Laravel config/services.php) ──
 PAYSTACK_SECRET_KEY = config("PAYSTACK_SECRET_KEY", default="")
