@@ -36,10 +36,12 @@ class Paystack(PaymentGateway):
     def _h(self):
         return {"Authorization": f"Bearer {self.secret}", "Content-Type": "application/json"}
 
-    def initialize_transaction(self, email, amount_kobo, reference, metadata=None):
-        return requests.post(f"{self.base}/transaction/initialize", json={
-            "email": email, "amount": amount_kobo, "reference": reference,
-            "metadata": metadata or {}}, headers=self._h, timeout=30).json()
+    def initialize_transaction(self, email, amount_kobo, reference, metadata=None, callback_url=None):
+        body = {"email": email, "amount": amount_kobo, "reference": reference, "metadata": metadata or {}}
+        if callback_url:
+            body["callback_url"] = callback_url
+        return requests.post(f"{self.base}/transaction/initialize", json=body,
+                             headers=self._h, timeout=30).json()
 
     def verify_transaction(self, reference):
         return requests.get(f"{self.base}/transaction/verify/{reference}",
@@ -102,13 +104,24 @@ class HandlePaystackWebhookService:
 
     def _charge_success(self, data):
         from apps.accounts.models import User as _User
+        from apps.finance.models import PaymentLog as _PaymentLog
         meta = data.get("metadata", {}) or {}
         user_id = meta.get("user_id")
         amount_naira = _d(data.get("amount", 0)) / 100
         reference = data.get("reference", "")
+
+        # Deduplicate: skip if this reference was already processed
+        log = _PaymentLog.objects.filter(txn_ref=reference).first()
+        if log and log.status == "success":
+            return {"event": "charge.success", "handled": True, "note": "already processed"}
+
         if user_id and amount_naira > 0:
             TransactionLogService.credit(int(user_id), USER_TYPE, amount_naira,
-                                         comment="Wallet funding")
+                                         comment=f"Wallet funding ({reference})")
+            if log:
+                log.status = "success"
+                log.gateway_response = "Paystack charge.success"
+                log.save(update_fields=["status", "gateway_response"])
             user = _User.objects.filter(id=user_id).first()
             if user:
                 from ..email_templates import wallet_funded_email

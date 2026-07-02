@@ -71,11 +71,26 @@ def fund_wallet(request):
     if not amount:
         return error("amount is required", status=422)
     gateway_name = request.data.get("gateway") or request.data.get("payment_gateway")
+    callback_url = request.data.get("callback_url") or "http://127.0.0.1:8000"
     gateway = PaymentGateway.resolve(gateway_name)
     ref = PaymentGateway.gen_ref("FUND")
+    amount_kobo = int(float(amount) * 100)
     result = gateway.initialize_transaction(
-        request.user.email, int(float(amount) * 100), ref,
-        metadata={"user_id": request.user.id, "purpose": "wallet_funding"})
+        request.user.email, amount_kobo, ref,
+        metadata={"user_id": request.user.id, "purpose": "wallet_funding"},
+        callback_url=callback_url)
+    PaymentLog.objects.get_or_create(
+        txn_ref=ref,
+        defaults={
+            "amount": amount_kobo,
+            "status": "pending",
+            "provider": gateway_name or "paystack",
+            "authorization_url": (result.get("data") or {}).get("authorization_url"),
+            "transaction_owner_id": request.user.id,
+            "transaction_owner_type": "App\\Models\\User",
+            "meta": {"user_id": request.user.id, "purpose": "wallet_funding"},
+        },
+    )
     return success("Transaction initialized", result)
 
 
