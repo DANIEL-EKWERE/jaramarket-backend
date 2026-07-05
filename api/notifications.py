@@ -219,7 +219,7 @@ class FirebasePush:
                 android=messaging.AndroidConfig(
                     priority="high",
                     notification=messaging.AndroidNotification(
-                        channel_id="high_importance_channel",
+                        channel_id="fcm_default_channel",
                         priority="max",
                         default_sound=True,
                         default_vibrate_timings=True,
