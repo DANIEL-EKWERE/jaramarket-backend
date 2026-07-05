@@ -1,3 +1,6 @@
+from collections import defaultdict
+
+from django.db.models import Prefetch
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 
@@ -5,10 +8,13 @@ from api.utils import error, success
 from api.services import UserRegistrationService
 from apps.geo.serializers import StateSerializer
 from apps.support.models import Advertisement
-from .models import Category, Ingredient, Product, Uom
+from .models import (
+    Category, CategoryProduct, Ingredient, IngredientLgaPrice,
+    IngredientProduct, IngredientStatePrice, Product, ProductStatePrice, Uom,
+)
 from .serializers import (
     AdvertisementSerializer, CategorySerializer,
-    IngredientSerializer, ProductSerializer, UomSerializer,
+    IngredientSerializer, ProductSerializer, UomSerializer, _full_image_url,
 )
 
 
@@ -40,18 +46,63 @@ def categories_all_products(request):
     qs    = Category.objects.all().order_by("sort_by")
     total = qs.count()
     start = (page - 1) * per_page
-    cats  = qs[start: start + per_page]
+    cats  = list(qs[start: start + per_page])
+    cat_ids = [c.id for c in cats]
+
+    # Build filtered prefetch querysets for location pricing (one DB hit each)
+    prod_state_qs = (ProductStatePrice.objects.filter(state_id=state_id)
+                     if state_id else ProductStatePrice.objects.none())
+    ing_state_qs  = (IngredientStatePrice.objects.filter(state_id=state_id)
+                     if state_id else IngredientStatePrice.objects.none())
+    ing_lga_qs    = (IngredientLgaPrice.objects.filter(lga_id=lga_id)
+                     if lga_id else IngredientLgaPrice.objects.none())
+
+    # Fetch ALL products for this page of categories in one query with all prefetches
+    products_qs = (
+        Product.objects
+        .filter(categories__id__in=cat_ids)
+        .prefetch_related(
+            Prefetch("state_prices", queryset=prod_state_qs, to_attr="_loc_state_prices"),
+            Prefetch(
+                "ingredientproduct_set",
+                queryset=IngredientProduct.objects.select_related("ingredient").prefetch_related(
+                    Prefetch("ingredient__state_prices", queryset=ing_state_qs, to_attr="_loc_state_prices"),
+                    Prefetch("ingredient__lga_prices",   queryset=ing_lga_qs,   to_attr="_loc_lga_prices"),
+                ),
+            ),
+        )
+        .distinct()
+    )
+    prod_by_id = {p.id: p for p in products_qs}
+
+    # Map category → products using CategoryProduct (one query)
+    cat_product_map = defaultdict(list)
+    for cp in CategoryProduct.objects.filter(category_id__in=cat_ids, product_id__in=prod_by_id):
+        cat_product_map[cp.category_id].append(prod_by_id[cp.product_id])
+
+    def _prod_price(prod):
+        prices = getattr(prod, "_loc_state_prices", [])
+        if prices:
+            return {"price": prices[0].price, "discount_price": prices[0].discount_price, "price_source": "state"}
+        return {"price": prod.price, "discount_price": prod.discount_price, "price_source": "default"}
+
+    def _ing_price(ing):
+        for p in getattr(ing, "_loc_lga_prices", []):
+            return {"price": p.price, "discounted_price": p.discounted_price, "price_source": "lga"}
+        for p in getattr(ing, "_loc_state_prices", []):
+            return {"price": p.price, "discounted_price": p.discounted_price, "price_source": "state"}
+        return {"price": ing.price, "discounted_price": ing.discounted_price, "price_source": "default"}
 
     def _resolve_product(prod):
-        loc = prod.get_price_for_location(state_id=state_id)
-        is_state_price = loc["price_source"] != "default"
+        loc = _prod_price(prod)
         ingr_data = []
-        for ip in prod.ingredientproduct_set.select_related("ingredient").all():
+        for ip in prod.ingredientproduct_set.all():
             ing  = ip.ingredient
-            iloc = ing.get_price_for_location(lga_id=lga_id, state_id=state_id)
+            iloc = _ing_price(ing)
             ingr_data.append({
                 "id": ing.id, "name": ing.name, "category_id": ing.category_id,
-                "unit": ing.unit, "stock": ing.stock, "image_url": ing.image_url,
+                "unit": ing.unit, "stock": ing.stock,
+                "image_url": _full_image_url(ing.image_url),
                 "price": str(iloc["price"]),
                 "discounted_price": str(iloc["discounted_price"]) if iloc["discounted_price"] else None,
                 "is_state_price": iloc["price_source"] != "default",
@@ -62,8 +113,8 @@ def categories_all_products(request):
             "id": prod.id, "name": prod.name, "description": prod.description,
             "price": str(loc["price"]),
             "discount_price": str(loc["discount_price"]) if loc["discount_price"] else None,
-            "is_state_price": is_state_price,
-            "stock": prod.stock, "image_url": prod.image_url,
+            "is_state_price": loc["price_source"] != "default",
+            "stock": prod.stock, "image_url": _full_image_url(prod.image_url),
             "rating": prod.rating, "preparation_steps": prod.preparation_steps,
             "ingredients": ingr_data,
             "created_at": prod.created_at.isoformat() if prod.created_at else None,
@@ -71,10 +122,9 @@ def categories_all_products(request):
 
     out = []
     for cat in cats:
-        products = list(cat.products.prefetch_related("ingredientproduct_set__ingredient").all())
         out.append({
             **CategorySerializer(cat).data,
-            "products": [_resolve_product(p) for p in products],
+            "products": [_resolve_product(p) for p in cat_product_map.get(cat.id, [])],
         })
 
     last_page = (total + per_page - 1) // per_page
@@ -90,9 +140,26 @@ def categories_all_products(request):
 @api_view(["GET"])
 def categories_limit_products(request):
     limit = int(request.query_params.get("limit", 5))
+    cats = list(Category.objects.all().order_by("sort_by"))
+    cat_ids = [c.id for c in cats]
+
+    # Fetch all category→product links with ingredients prefetched (a few queries total)
+    cp_qs = (CategoryProduct.objects
+             .filter(category_id__in=cat_ids)
+             .select_related("product")
+             .prefetch_related(
+                 Prefetch("product__ingredientproduct_set",
+                          queryset=IngredientProduct.objects.select_related("ingredient"))
+             ))
+    cat_product_map = defaultdict(list)
+    for cp in cp_qs:
+        bucket = cat_product_map[cp.category_id]
+        if len(bucket) < limit:
+            bucket.append(cp.product)
+
     out = [{**CategorySerializer(cat).data,
-            "products": ProductSerializer(cat.products.all()[:limit], many=True).data}
-           for cat in Category.objects.all().order_by("sort_by")]
+            "products": ProductSerializer(cat_product_map.get(cat.id, []), many=True).data}
+           for cat in cats]
     return success("Categories with limited products retrieved", out)
 
 
