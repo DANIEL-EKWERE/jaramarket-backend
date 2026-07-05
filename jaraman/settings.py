@@ -121,8 +121,21 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-MEDIA_URL = "/storage/"            # mirrors Laravel public storage path
-MEDIA_ROOT = BASE_DIR / "public"   # drop the contents of public.zip here
+MEDIA_URL = "/storage/"
+MEDIA_ROOT = BASE_DIR / "public"
+
+# ── AWS S3 (used to construct public image URLs) ──
+AWS_ACCESS_KEY_ID     = config("AWS_ACCESS_KEY_ID", default="")
+AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY", default="")
+AWS_STORAGE_BUCKET_NAME = config("AWS_BUCKET", default="")
+AWS_DEFAULT_REGION    = config("AWS_DEFAULT_REGION", default="us-east-1")
+_s3_bucket = AWS_STORAGE_BUCKET_NAME
+_s3_region = AWS_DEFAULT_REGION
+# Full base URL for S3-hosted assets (used by serializers to build image URLs)
+MEDIA_BASE_URL = config(
+    "MEDIA_BASE_URL",
+    default=f"https://{_s3_bucket}.s3.{_s3_region}.amazonaws.com" if _s3_bucket else "",
+)
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ── DRF ──
