@@ -70,7 +70,7 @@ WSGI_APPLICATION = "jaraman.wsgi.application"
 ASGI_APPLICATION = "jaraman.asgi.application"
 
 # Database — defaults to MySQL (matching Laravel). Override via .env.
-DB_CONNECTION = config("DB_CONNECTION", default="sqlite")
+DB_CONNECTION = config("DB_CONNECTION", default="pgsql")
 if DB_CONNECTION == "mysql":
     DATABASES = {"default": {
         "ENGINE": "django.db.backends.mysql",
@@ -83,9 +83,9 @@ if DB_CONNECTION == "mysql":
 elif DB_CONNECTION == "pgsql":
     DATABASES = {"default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": config("DB_DATABASE"),
-        "USER": config("DB_USERNAME"),
-        "PASSWORD": config("DB_PASSWORD", default=""),
+        "NAME": config("DB_DATABASE", default="jewmqoeq_jaramarket-db"),
+        "USER": config("DB_USERNAME", default="jewmqoeq_jaramarket-user"),
+        "PASSWORD": config("DB_PASSWORD", default="jaramarket123@DT"),
         "HOST": config("DB_HOST", default="127.0.0.1"),
         "PORT": config("DB_PORT", default="5432"),
     }}

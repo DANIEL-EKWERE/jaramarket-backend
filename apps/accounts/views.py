@@ -260,6 +260,8 @@ def google_signin(request):
         from google.auth.transport import requests as google_requests
 
         client_ids = [c.strip() for c in settings.GOOGLE_CLIENT_IDS.split(",") if c.strip()]
+        if not client_ids:
+            return error("Google sign-in is not configured on this server.", status=503)
         idinfo = None
         last_exc = None
         for client_id in client_ids:
@@ -298,6 +300,12 @@ def google_signin(request):
         user.is_active = True
         user.save(update_fields=["is_active"])
 
-    payload = auth_user_payload(user)
+    if created:
+        Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+
+    from api.services._base import issue_tokens
+    tokens = issue_tokens(user)
+    payload = auth_user_payload(user, token=tokens["access_token"], refresh=tokens["refresh_token"])
+    payload["is_new_user"] = created
     code = 201 if created else 200
     return success("Google sign-in successful", payload, status=code)
