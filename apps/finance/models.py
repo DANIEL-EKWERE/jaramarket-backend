@@ -123,3 +123,20 @@ class Commission(SoftDeleteModel):
 
     class Meta:
         db_table = "commissions"
+
+
+class ServiceFeeTier(SoftDeleteModel):
+    """Customer-facing order service fee bands. A tier applies when
+    min_amount < order_subtotal <= max_amount (max_amount null = no upper
+    bound, i.e. the top tier). The lower tier owns its own boundary value."""
+    FLAT = "flat"
+    PERCENTAGE = "percentage"
+    FEE_TYPE_CHOICES = [(FLAT, "flat"), (PERCENTAGE, "percentage")]
+
+    min_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    max_amount = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    fee_type = models.CharField(max_length=20, choices=FEE_TYPE_CHOICES, default=PERCENTAGE)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "service_fee_tiers"

@@ -27,6 +27,16 @@ class IsVendor(permissions.BasePermission):
         return bool(request.user and request.user.is_authenticated and request.user.is_vendor())
 
 
+class IsQAOrAdmin(permissions.BasePermission):
+    message = "QA or admin access required."
+
+    def has_permission(self, request, view):
+        from apps.accounts.models import Roles
+        user = request.user
+        return bool(user and user.is_authenticated and
+                    (user.role == Roles.QA or user.role in Roles.ADMIN_ROLES))
+
+
 _svc = OrderService()
 
 
@@ -68,6 +78,7 @@ def order_cancel(request, order):
 
 
 @api_view(["POST"])
+@permission_classes([IsAuthenticated, IsQAOrAdmin])
 def order_mark_completed(request, order):
     try:
         obj = _svc.mark_completed(request.user, order)
@@ -107,6 +118,16 @@ def vendor_decide(request, item_id):
     except ValueError as e:
         return error(str(e), status=404)
     return success("Action taken successfully", VendorOrderItemSerializer(item).data)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated, IsVendor])
+def vendor_deliver(request, item_id):
+    try:
+        item = _svc.mark_delivered(request.user, item_id)
+    except ValueError as e:
+        return error(str(e), status=422)
+    return success("Item marked as delivered", VendorOrderItemSerializer(item).data)
 
 
 @api_view(["GET"])

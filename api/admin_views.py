@@ -18,7 +18,7 @@ from rest_framework.decorators import api_view, permission_classes
 
 from apps.accounts.models import Roles, User
 from apps.catalogue.models import Category, CategoryProduct, Ingredient, IngredientProduct, Product
-from apps.finance.models import Commission, TransactionLog, Transfer, Wallet, Bank
+from apps.finance.models import Commission, ServiceFeeTier, TransactionLog, Transfer, Wallet, Bank
 from apps.orders.models import Order, OrderItem
 from apps.support.models import Advertisement
 from apps.geo.models import State
@@ -561,3 +561,51 @@ def commission_detail(request, id):
             setattr(c, field, request.data[field])
     c.save()
     return success("Commission updated successfully", _commission_payload(c))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+#  Service Fee Tier CRUD
+# ─────────────────────────────────────────────────────────────────────────────
+def _service_fee_tier_payload(t):
+    return {"id": t.id, "min_amount": t.min_amount, "max_amount": t.max_amount,
+            "fee_type": t.fee_type, "value": t.value, "created_at": t.created_at}
+
+
+@api_view(["GET", "POST"])
+@permission_classes([IsAdmin])
+def service_fee_tiers_collection(request):
+    if request.method == "GET":
+        if (resp := require_perms(request.user, ["view_service_fees"])):
+            return resp
+        qs = ServiceFeeTier.objects.all().order_by("min_amount")
+        return success("Service fee tiers retrieved", [_service_fee_tier_payload(t) for t in qs])
+    if (resp := require_perms(request.user, ["manage_service_fees"])):
+        return resp
+    if request.data.get("value") is None:
+        return error("value is required", status=422)
+    if request.data.get("fee_type") not in (ServiceFeeTier.FLAT, ServiceFeeTier.PERCENTAGE):
+        return error("fee_type must be 'flat' or 'percentage'", status=422)
+    t = ServiceFeeTier.objects.create(
+        min_amount=request.data.get("min_amount", 0),
+        max_amount=request.data.get("max_amount"),
+        fee_type=request.data["fee_type"],
+        value=request.data["value"])
+    return success("Service fee tier created successfully", _service_fee_tier_payload(t), status=201)
+
+
+@api_view(["PUT", "PATCH", "DELETE"])
+@permission_classes([IsAdmin])
+def service_fee_tier_detail(request, id):
+    if (resp := require_perms(request.user, ["manage_service_fees"])):
+        return resp
+    t = ServiceFeeTier.objects.filter(id=id).first()
+    if not t:
+        return error("Service fee tier not found", status=404)
+    if request.method == "DELETE":
+        t.delete()
+        return success("Service fee tier deleted successfully")
+    for field in ["min_amount", "max_amount", "fee_type", "value"]:
+        if request.data.get(field) is not None:
+            setattr(t, field, request.data[field])
+    t.save()
+    return success("Service fee tier updated successfully", _service_fee_tier_payload(t))

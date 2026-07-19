@@ -25,6 +25,7 @@ class Roles:
         "manage_admins", "manage_roles", "manage_settings", "view_categories", "manage_categories",
         "view_products", "manage_products", "view_ingredients", "manage_ingredients",
         "view_commissions", "manage_commissions",
+        "view_service_fees", "manage_service_fees",
     ]
     DEFAULT_PERMISSIONS = {
         STATE_ADMIN: ["view_dashboard", "view_orders", "manage_orders", "view_users", "manage_users",

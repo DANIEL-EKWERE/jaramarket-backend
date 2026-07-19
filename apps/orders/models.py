@@ -56,7 +56,8 @@ class OrderItem(TimestampedModel):
 
 class OrderItemLog(TimestampedModel):
     STATUS_CHOICES = [("accepted", "accepted"), ("processing", "processing"),
-                      ("completed", "completed"), ("pending", "pending"), ("cancelled", "cancelled")]
+                      ("completed", "completed"), ("pending", "pending"), ("cancelled", "cancelled"),
+                      ("rejected", "rejected"), ("delivered", "delivered")]
     order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE,
                                    db_column="order_item_id", related_name="logs")
     vendor = models.ForeignKey("accounts.User", on_delete=models.CASCADE, db_column="vendor_id")

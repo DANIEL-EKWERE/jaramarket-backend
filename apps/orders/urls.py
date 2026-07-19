@@ -11,5 +11,6 @@ urlpatterns = [
     path("vendor/orders/accepted", v.vendor_my_orders),
     path("vendor/orders/<int:item_id>", v.vendor_order_item),
     path("vendor/orders/item/<int:item_id>/decision", v.vendor_decide),
+    path("vendor/orders/item/<int:item_id>/deliver", v.vendor_deliver),
     path("settings", v.settings_view),
 ]

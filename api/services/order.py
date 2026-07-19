@@ -10,7 +10,7 @@ from django.utils import timezone
 from apps.accounts.models import Roles
 from apps.catalogue.models import Ingredient, IngredientProduct, Product
 from apps.customers.models import Address
-from apps.finance.models import Commission, TransactionLog, Wallet
+from apps.finance.models import Commission, ServiceFeeTier, TransactionLog, Wallet
 from apps.orders.models import Order, OrderItem, OrderItemLog
 from apps.support.models import Setting
 from ._base import ORDER_TYPE, USER_TYPE, _d, _setting
@@ -41,6 +41,26 @@ def get_commission(amount, total):
 
 def models_q_max(amount):
     return Q(max_amount__isnull=True) | Q(max_amount__gte=amount)
+
+
+def calculate_service_fee(subtotal):
+    """Return the order-level service fee for a given subtotal, per the
+    tiered bands configured in ServiceFeeTier. Each tier applies when
+    min_amount < subtotal <= max_amount (max_amount null = no upper bound),
+    so the lower tier owns its own boundary (e.g. exactly ₦10,000 still
+    gets the flat-fee tier below it, not the percentage tier above it)."""
+    subtotal = _d(subtotal)
+    if subtotal <= 0:
+        return Decimal("0")
+    tier = (ServiceFeeTier.objects
+            .filter(min_amount__lt=subtotal)
+            .filter(Q(max_amount__isnull=True) | Q(max_amount__gte=subtotal))
+            .order_by("-min_amount").first())
+    if not tier:
+        return Decimal("0")
+    if tier.fee_type == ServiceFeeTier.FLAT:
+        return _d(tier.value)
+    return (subtotal * _d(tier.value) / 100).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
 
 class TransactionLogService:
@@ -94,9 +114,35 @@ class OrderService:
     def get_order_by_id(self, user, order_id):
         return Order.objects.filter(user=user, id=order_id).first()
 
+    def _calculate_subtotal(self, data):
+        """Independently resolve the order's subtotal server-side, mirroring
+        how _save_food/_save_ingredients price each line item, so the
+        service fee is computed against the real order value rather than
+        whatever the client claims."""
+        subtotal = Decimal("0")
+        for ing in data.get("ingredients", []):
+            model = Ingredient.objects.filter(id=ing["ingredient_id"]).first()
+            if not model:
+                raise ValueError(f"Ingredient {ing['ingredient_id']} not found")
+            price = _d(ing.get("price") if ing.get("price") is not None else model.price)
+            subtotal += price * _d(ing["quantity"])
+        for pd in data.get("products", []):
+            product = Product.objects.filter(id=pd["product_id"]).first()
+            if not product:
+                raise ValueError(f"Product {pd['product_id']} not found")
+            for link in IngredientProduct.objects.filter(product=product):
+                quantity = link.quantity or 1
+                subtotal += _d(link.ingredient.price) * _d(quantity)
+        return subtotal
+
     @transaction.atomic
     def create_order(self, user, data):
-        total = _d(data.get("total"))
+        subtotal = self._calculate_subtotal(data)
+        shipping_fee = _d(data.get("shipping_fee", 0))
+        vat = _d(data.get("vat", 0))
+        service_charge = calculate_service_fee(subtotal)
+        total = subtotal + shipping_fee + vat + service_charge
+
         wallet, _ = Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
         if _d(wallet.balance) < total:
             raise ValueError("Insufficient wallet balance.")
@@ -111,9 +157,9 @@ class OrderService:
             order_date=data.get("order_date") or timezone.now(),
             reference=self._reference(), user=user, address=address,
             delivery_type=data.get("delivery_type", "standard"),
-            shipping_fee=_d(data.get("shipping_fee", 0)),
-            service_charge=_d(data.get("service_charge", 0)),
-            vat=_d(data.get("vat", 0)), total=total,
+            shipping_fee=shipping_fee,
+            service_charge=service_charge,
+            vat=vat, total=total,
             remarks=data.get("remarks"), meal_prep=data.get("meal_prep"),
             status="pending")
 
@@ -217,6 +263,10 @@ class OrderService:
         if vendor.role != Roles.ADMIN:
             cat_ids = list(vendor.categories.values_list("id", flat=True))
             qs = qs.filter(ingredient__category_id__in=cat_ids)
+            rejected_item_ids = OrderItemLog.objects.filter(
+                vendor=vendor, status="rejected"
+            ).values_list("order_item_id", flat=True)
+            qs = qs.exclude(id__in=rejected_item_ids)
         return qs.order_by("-created_at")
 
     def my_orders(self, vendor):
@@ -235,23 +285,66 @@ class OrderService:
         item = OrderItem.objects.filter(id=item_id).first()
         if not item:
             raise ValueError("Order item not found")
-        status = "processing" if data.get("status") == "accepted" else "pending"
+        accepted = data.get("status") == "accepted"
         vendor_id = vendor.id
         if vendor.role == Roles.ADMIN and data.get("vendor_id"):
             vendor_id = data["vendor_id"]
-        item.status = status
+
+        from ..notifications import order_status_notification, order_item_status_notification
+
+        if not accepted:
+            # Rejected: log it against this vendor only, and leave the item
+            # pending and unassigned so other matching vendors can still
+            # pick it up. available_orders() excludes items a vendor has
+            # already rejected, so it won't boomerang back to them.
+            OrderItemLog.objects.create(order_item=item, vendor_id=vendor_id,
+                                        status="rejected", changed_at=timezone.now())
+            if item.vendor_id == vendor_id:
+                item.vendor_id = None
+                item.save(update_fields=["vendor_id"])
+            return item
+
+        item.status = "processing"
         item.vendor_id = vendor_id
         item.vendor_at = timezone.now()
         item.save(update_fields=["status", "vendor_id", "vendor_at"])
         OrderItemLog.objects.create(order_item=item, vendor_id=vendor_id,
-                                    status=status, changed_at=timezone.now())
-        from ..notifications import order_status_notification, order_item_status_notification
-        order_item_status_notification(item.order.user, item, status)
+                                    status="processing", changed_at=timezone.now())
+        order_item_status_notification(item.order.user, item, "processing")
         order = item.order
         if order.items.exclude(status="processing").count() == 0:
             order.status = "processing"
             order.save(update_fields=["status"])
             order_status_notification(order.user, order, "processing")
+        return item
+
+    @transaction.atomic
+    def mark_delivered(self, vendor, item_id):
+        """Vendor-facing: mark just their own line item as delivered. Does
+        not pay anyone out or complete the order — that's still a separate
+        QA/admin step via mark_completed, since one order can span multiple
+        vendors and paying everyone out the moment one of them delivers
+        would be wrong."""
+        item = OrderItem.objects.filter(id=item_id).first()
+        if not item:
+            raise ValueError("Order item not found")
+        if item.vendor_id != vendor.id and vendor.role not in Roles.ADMIN_ROLES:
+            raise ValueError("This item is not assigned to you.")
+        if item.status != "processing":
+            raise ValueError(f"Item cannot be marked delivered from status '{item.status}'.")
+
+        item.status = "delivered"
+        item.save(update_fields=["status"])
+        OrderItemLog.objects.create(order_item=item, vendor_id=item.vendor_id,
+                                    status="delivered", changed_at=timezone.now())
+
+        from ..notifications import order_status_notification, order_item_status_notification
+        order_item_status_notification(item.order.user, item, "delivered")
+        order = item.order
+        if order.items.exclude(status__in=("delivered", "completed")).count() == 0:
+            order.status = "delivered"
+            order.save(update_fields=["status"])
+            order_status_notification(order.user, order, "delivered")
         return item
 
     @transaction.atomic

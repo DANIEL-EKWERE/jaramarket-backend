@@ -44,6 +44,8 @@ urlpatterns = [
     path("admin/advertisements/<int:id>", av.advertisement_detail),
     path("admin/commissions", av.commissions_collection),
     path("admin/commissions/<int:id>", av.commission_detail),
+    path("admin/service-fee-tiers", av.service_fee_tiers_collection),
+    path("admin/service-fee-tiers/<int:id>", av.service_fee_tier_detail),
 
     # ── Admin reports & exports ──
     path("admin/reports/orders", rv.report_orders),
