@@ -32,8 +32,6 @@ class UserRegistrationService:
             referrer.save(update_fields=["referral_count"])
         Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
         self.send_otp(user.email, user=user)
-        from api.notifications import welcome_notification
-        welcome_notification(user)
         return user
 
     def _generate_referral_code(self):
@@ -68,9 +66,13 @@ class UserRegistrationService:
         return user
 
     def validate_email(self, user):
+        was_active = user.is_active
         user.email_verified_at = timezone.now()
         user.is_active = True
         user.save(update_fields=["email_verified_at", "is_active"])
+        if not was_active:
+            from api.notifications import welcome_notification
+            welcome_notification(user)
         return user
 
     def reset_password(self, email, otp, new_password):

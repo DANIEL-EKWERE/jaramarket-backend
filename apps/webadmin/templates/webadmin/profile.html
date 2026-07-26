@@ -1,0 +1,26 @@
+{% extends "webadmin/base.html" %}
+{% block page_title %}My Profile{% endblock %}
+{% block content %}
+<div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="w-full px-6 lg:px-8 py-4">
+        <div class="breadcrumb"><span>My Profile</span></div>
+        <h1 class="page-title">My Profile</h1>
+    </div>
+</div>
+
+<div class="w-full px-6 lg:px-8 py-6">
+    <div class="card p-6 max-w-lg">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div><label>First name</label><input type="text" name="firstname" value="{{ request.user.firstname }}"></div>
+            <div><label>Last name</label><input type="text" name="lastname" value="{{ request.user.lastname }}"></div>
+            <div><label>Email</label><input type="email" name="email" value="{{ request.user.email }}"></div>
+            <div><label>Phone</label><input type="text" name="phone" value="{{ request.user.phone_number|default:'' }}"></div>
+            <div><label>New Password <span class="text-slate-400 font-normal">(leave blank to keep unchanged)</span></label><input type="password" name="password"></div>
+            <div class="flex gap-2 pt-2">
+                <button type="submit" class="btn-primary">Save</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -29,10 +29,30 @@ def _paginate(request, qs, serializer_cls):
             "per_page": p.page_size}
 
 
+# Mirrors App\Enums\CategoryTypeEnum::VENDOR in the PHP source (id=2, seeded
+# identically everywhere). Vendor-type categories are the ones a vendor picks
+# during onboarding; Food-type categories (id=1) are for the jara-user app's
+# recipe/product listings and must never be offered here.
+VENDOR_CATEGORY_TYPE_ID = 2
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def vendor_categories(request):
-    return success("Vendor categories retrieved", CategorySerializer(Category.objects.all(), many=True).data)
+    cats = (Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID)
+            .order_by("sort_by").prefetch_related("ingredients"))
+    out = [{
+        **CategorySerializer(cat).data,
+        "ingredients": [{
+            "id": ing.id, "name": ing.name, "description": ing.description,
+            "price": str(ing.price),
+            "discount_price": str(ing.discounted_price) if ing.discounted_price is not None else None,
+            "unit": ing.unit, "stock": ing.stock,
+            "image_url": _full_image_url(ing.image_url) or "",
+            "created_at": ing.created_at.isoformat() if ing.created_at else None,
+        } for ing in cat.ingredients.all()],
+    } for cat in cats]
+    return success("Vendor categories retrieved", out)
 
 
 @api_view(["GET"])

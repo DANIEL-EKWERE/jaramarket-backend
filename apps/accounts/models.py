@@ -8,13 +8,14 @@ class Roles:
     ADMIN = "admin"; SUPER_ADMIN = "super_admin"; STATE_ADMIN = "state_admin"
     VENDOR_MANAGER = "vendor_manager"; ACCOUNTS = "accounts"; AUDIT = "audit"
     LOGISTICS = "logistics"; VENDOR = "vendor"; CUSTOMER = "customer"
-    QA = "qa"; ACCOUNT = "account"
+    QA = "qa"; ACCOUNT = "account"; STATE_REPRESENTATIVE = "state_representative"
 
     CHOICES = [
         (ADMIN, "Super Admin"), (SUPER_ADMIN, "Super Admin"), (STATE_ADMIN, "State Admin"),
         (VENDOR_MANAGER, "Vendor Manager"), (ACCOUNTS, "Accounts"), (AUDIT, "Audit"),
         (LOGISTICS, "Logistics"), (VENDOR, "Vendor"), (CUSTOMER, "Customer"),
         (QA, "Quality Assurance"), (ACCOUNT, "Account"),
+        (STATE_REPRESENTATIVE, "State Representative"),
     ]
     ADMIN_ROLES = [SUPER_ADMIN, ADMIN, STATE_ADMIN, VENDOR_MANAGER, ACCOUNTS, AUDIT, LOGISTICS]
 
@@ -26,6 +27,8 @@ class Roles:
         "view_products", "manage_products", "view_ingredients", "manage_ingredients",
         "view_commissions", "manage_commissions",
         "view_service_fees", "manage_service_fees",
+        "view_franchises", "manage_franchises",
+        "view_representatives", "manage_representatives",
     ]
     DEFAULT_PERMISSIONS = {
         STATE_ADMIN: ["view_dashboard", "view_orders", "manage_orders", "view_users", "manage_users",

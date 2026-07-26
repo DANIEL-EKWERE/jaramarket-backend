@@ -1,0 +1,268 @@
+{% load webadmin_extras %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Dashboard{% endblock %} — JaraMarket</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/@tailwindcss/browser@4"></script>
+    <style>
+        [x-cloak]{display:none!important}
+        body{font-family:'Inter',sans-serif}
+        .badge-success{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:#d1fae5;color:#065f46}
+        .badge-danger{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:#fee2e2;color:#991b1b}
+        .badge-warning{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:#fef3c7;color:#92400e}
+        .badge-info{display:inline-flex;align-items:center;padding:2px 8px;border-radius:9999px;font-size:11px;font-weight:600;background:#dbeafe;color:#1e40af}
+        .btn-primary{display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#059669;color:#fff;font-size:14px;font-weight:600;border-radius:8px;box-shadow:0 1px 2px rgba(0,0,0,.05);transition:background .15s}
+        .btn-primary:hover{background:#047857}
+        .btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;background:#fff;border:1px solid #cbd5e1;color:#334155;font-size:14px;font-weight:500;border-radius:8px;transition:background .15s}
+        .btn-secondary:hover{background:#f8fafc}
+        .btn-danger-soft{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:500;color:#ef4444;background:#fef2f2;border:1px solid #fee2e2;border-radius:8px;transition:background .15s}
+        .btn-danger-soft:hover{background:#fee2e2}
+        .btn-edit{display:inline-flex;align-items:center;gap:4px;padding:6px 12px;font-size:12px;font-weight:500;color:#475569;background:#f1f5f9;border-radius:8px;transition:background .15s}
+        .btn-edit:hover{background:#e2e8f0}
+        .nav-link{display:flex;align-items:center;gap:10px;width:100%;padding:9px 14px;font-size:13.5px;color:#d1fae5;border-radius:8px;transition:background .15s}
+        .nav-link:hover,.nav-link.active{background:rgba(0,0,0,.25);color:#fff}
+        .nav-section{padding:14px 14px 4px;font-size:10px;font-weight:700;color:#6ee7b7;text-transform:uppercase;letter-spacing:.08em}
+        input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],select,textarea{width:100%;padding:9px 12px;font-size:14px;border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;outline:none;transition:border .15s,box-shadow .15s}
+        input:focus,select:focus,textarea:focus{border-color:#059669;box-shadow:0 0 0 3px rgba(5,150,105,.15)}
+        label{display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:5px}
+        .card{background:#fff;border:1px solid #e2e8f0;border-radius:14px}
+        .page-title{font-size:20px;font-weight:700;color:#0f172a}
+        .breadcrumb{display:flex;align-items:center;gap:6px;font-size:12px;color:#94a3b8;margin-bottom:2px}
+        table.admin-table thead th{background:#f8fafc;font-weight:600;font-size:11px;color:#64748b;text-transform:uppercase;letter-spacing:.04em;padding:14px 16px;text-align:left}
+        table.admin-table tbody td{padding:14px 16px;font-size:13.5px}
+        table.admin-table tbody tr{border-top:1px solid #f1f5f9;transition:background .1s}
+        table.admin-table tbody tr:hover{background:#f8fafc}
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="bg-slate-50 antialiased">
+<div class="flex h-screen overflow-hidden">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-50 flex flex-col w-64 bg-green-700 shadow-xl transform -translate-x-full md:translate-x-0 transition-transform duration-300">
+        <div class="flex items-center gap-3 px-5 py-4 border-b border-green-600">
+            <div class="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center">
+                <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 20 20"><path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3z"/></svg>
+            </div>
+            <a href="{% url 'webadmin:dashboard' %}" class="text-lg font-bold text-white">JaraMarket</a>
+        </div>
+        <div class="flex items-center gap-3 px-5 py-3 bg-green-800/40 border-b border-green-600">
+            <div class="w-8 h-8 rounded-full bg-green-500 flex items-center justify-center text-white font-bold text-sm">{{ request.user.firstname|slice:":1"|upper }}</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-white truncate">{{ request.user.firstname }} {{ request.user.lastname }}</p>
+                <p class="text-xs text-green-300">{{ request.user.role }}</p>
+            </div>
+        </div>
+        <nav class="flex-1 overflow-y-auto px-3 py-3">
+            <a href="{% url 'webadmin:dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                Dashboard
+            </a>
+
+            {% if request.user|has_perm_slug:"view_orders" %}
+            <a href="{% url 'webadmin:orders_list' %}" class="nav-link {% if 'order' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
+                Orders
+            </a>
+            {% endif %}
+
+            {% if request.user|has_any_perm:"view_categories,view_products,view_ingredients" %}
+            <p class="nav-section">Catalogue</p>
+            {% if request.user|has_perm_slug:"view_products" %}
+            <a href="{% url 'webadmin:products_list' %}" class="nav-link {% if 'product' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10"/></svg>
+                Food / Products
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_ingredients" %}
+            <a href="{% url 'webadmin:ingredients_list' %}" class="nav-link {% if 'ingredient' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Ingredients
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_categories" %}
+            <a href="{% url 'webadmin:categories_list' %}" class="nav-link {% if 'categor' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a4 4 0 014-4z"/></svg>
+                Categories
+            </a>
+            {% endif %}
+            <a href="{% url 'webadmin:advertisements_list' %}" class="nav-link {% if 'advertisement' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z"/></svg>
+                Advertisements
+            </a>
+            {% endif %}
+
+            {% if request.user|has_any_perm:"view_users,view_vendors,view_franchises,view_representatives" %}
+            <p class="nav-section">People</p>
+            {% if request.user|has_perm_slug:"view_users" %}
+            <a href="{% url 'webadmin:users_list' %}" class="nav-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                Customers
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_vendors" %}
+            <a href="{% url 'webadmin:vendors_list' %}" class="nav-link {% if 'vendor' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                Vendors
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_franchises" %}
+            <a href="{% url 'webadmin:franchises_list' %}" class="nav-link {% if 'franchise' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2M19 21h-4M5 21H3m2 0h4M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 6v-3a1 1 0 011-1h2a1 1 0 011 1v3"/></svg>
+                Franchises
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_representatives" %}
+            <a href="{% url 'webadmin:representatives_list' %}" class="nav-link {% if 'representative' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                State Representatives
+            </a>
+            {% endif %}
+            {% endif %}
+
+            {% if request.user|has_any_perm:"view_transactions,view_wallets,manage_withdrawals,view_commissions,view_service_fees" %}
+            <p class="nav-section">Finance</p>
+            {% if request.user|has_perm_slug:"view_transactions" %}
+            <a href="{% url 'webadmin:finance_transactions' %}" class="nav-link {% if request.resolver_match.url_name == 'finance_transactions' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Transactions
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_wallets" %}
+            <a href="{% url 'webadmin:finance_wallets' %}" class="nav-link {% if request.resolver_match.url_name == 'finance_wallets' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
+                Wallets
+            </a>
+            {% endif %}
+            {% if request.user|has_any_perm:"manage_withdrawals,view_transactions" %}
+            <a href="{% url 'webadmin:finance_withdrawals' %}" class="nav-link {% if request.resolver_match.url_name == 'finance_withdrawals' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"/></svg>
+                Withdrawals
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_commissions" %}
+            <a href="{% url 'webadmin:commissions_list' %}" class="nav-link {% if request.resolver_match.url_name == 'commissions_list' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                Commissions
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_service_fees" %}
+            <a href="{% url 'webadmin:service_fee_tiers_list' %}" class="nav-link {% if request.resolver_match.url_name == 'service_fee_tiers_list' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                Service Fee Tiers
+            </a>
+            {% endif %}
+            {% endif %}
+
+            {% if request.user|has_perm_slug:"view_reports" %}
+            <p class="nav-section">Reports</p>
+            <a href="{% url 'webadmin:report_orders' %}" class="nav-link {% if 'report' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                Reports
+            </a>
+            {% endif %}
+
+            {% if request.user|has_any_perm:"manage_admins,manage_settings" %}
+            <p class="nav-section">System</p>
+            {% if request.user|has_perm_slug:"manage_admins" %}
+            <a href="{% url 'webadmin:admins_list' %}" class="nav-link {% if 'admin' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                Admin Users
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"manage_settings" %}
+            <a href="{% url 'webadmin:settings' %}" class="nav-link {% if request.resolver_match.url_name == 'settings' %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Settings
+            </a>
+            {% endif %}
+            {% endif %}
+        </nav>
+
+        <div class="border-t border-green-600 px-3 py-3">
+            <form method="post" action="{% url 'webadmin:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="nav-link w-full text-left text-red-300 hover:text-white hover:bg-red-700/40">
+                    <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>
+                    Sign out
+                </button>
+            </form>
+        </div>
+    </aside>
+
+    <div class="flex flex-col flex-1 md:ml-64 overflow-hidden">
+        <header class="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm">
+            <div class="flex items-center justify-between px-4 sm:px-6 py-3">
+                <button id="sidebarToggle" class="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
+                <div class="flex-1"></div>
+                <div x-data="{open:false}" class="relative">
+                    <button @click="open=!open" class="flex items-center gap-2 p-1.5 rounded-lg hover:bg-slate-100">
+                        <div class="w-7 h-7 rounded-full bg-green-600 flex items-center justify-center text-white text-xs font-bold">{{ request.user.firstname|slice:":1"|upper }}</div>
+                        <span class="hidden sm:block text-sm font-medium text-slate-700">{{ request.user.firstname }}</span>
+                        <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                    </button>
+                    <div x-show="open" @click.outside="open=false" x-cloak class="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-50">
+                        <a href="{% url 'webadmin:profile' %}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">My Profile</a>
+                        <a href="{% url 'webadmin:notifications_list' %}" class="block px-4 py-2 text-sm text-slate-700 hover:bg-slate-50">Notifications</a>
+                        <form method="post" action="{% url 'webadmin:logout' %}">
+                            {% csrf_token %}
+                            <button type="submit" class="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50">Sign out</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto">
+            {% if messages %}
+            <div class="px-4 sm:px-6 pt-6">
+                {% for message in messages %}
+                <div class="mb-4 flex items-start gap-3 px-4 py-3 {% if message.tags == 'error' %}bg-red-50 border border-red-200 text-red-800{% else %}bg-emerald-50 border border-emerald-200 text-emerald-800{% endif %} rounded-xl text-sm">
+                    <svg class="w-5 h-5 flex-shrink-0 mt-0.5 {% if message.tags == 'error' %}text-red-500{% else %}text-emerald-500{% endif %}" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+                    {{ message }}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+</div>
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+<script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+<script>
+$(function(){
+    $('#sidebarToggle').on('click',function(){$('#sidebar').toggleClass('-translate-x-full translate-x-0');});
+    $(document).on('click',function(e){
+        if($(window).width()<768 && !$(e.target).closest('#sidebar,#sidebarToggle').length){
+            $('#sidebar').addClass('-translate-x-full').removeClass('translate-x-0');
+        }
+    });
+    $(document).on('submit', 'form[data-confirm]', function(e){
+        const form = this;
+        if (form.dataset.confirmed) return true;
+        e.preventDefault();
+        Swal.fire({
+            title: form.dataset.confirm || 'Are you sure?',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#059669',
+            cancelButtonColor: '#94a3b8',
+            confirmButtonText: 'Yes, continue'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                form.dataset.confirmed = '1';
+                form.submit();
+            }
+        });
+    });
+});
+</script>
+{% block extra_scripts %}{% endblock %}
+</body>
+</html>

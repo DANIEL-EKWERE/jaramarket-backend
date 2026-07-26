@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     "apps.support",
     # Routing / utility layer (tasks, consumers, admin views)
     "api",
+    "apps.webadmin",
 ]
 
 MIDDLEWARE = [
@@ -70,7 +71,7 @@ WSGI_APPLICATION = "jaraman.wsgi.application"
 ASGI_APPLICATION = "jaraman.asgi.application"
 
 # Database — defaults to MySQL (matching Laravel). Override via .env.
-DB_CONNECTION = config("DB_CONNECTION", default="pgsql")
+DB_CONNECTION = config("DB_CONNECTION", default="pgsqlx")
 if DB_CONNECTION == "mysql":
     DATABASES = {"default": {
         "ENGINE": "django.db.backends.mysql",
@@ -90,13 +91,13 @@ elif DB_CONNECTION == "pgsql":
         "PORT": config("DB_PORT", default="5432"),
     }}
 else:
-    DATABASES = {
-    'default': dj_database_url.parse("postgresql://jaramarket_db_user:3W8PsKFhskKtA6GoQb0UxHJvqjAVDVTn@dpg-d8rt7a36sc1c73boctl0-a.oregon-postgres.render.com/jaramarket_db")
-        }
-    # DATABASES = {"default": {
-    #     "ENGINE": "django.db.backends.sqlite3",
-    #     "NAME": BASE_DIR / "db.sqlite3",
-    # }}
+    # DATABASES = {
+    # 'default': dj_database_url.parse("postgresql://jaramarket_db_user:3W8PsKFhskKtA6GoQb0UxHJvqjAVDVTn@dpg-d8rt7a36sc1c73boctl0-a.oregon-postgres.render.com/jaramarket_db")
+    #     }
+    DATABASES = {"default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
+    }}
 
 AUTH_USER_MODEL = "accounts.User"
 
@@ -194,6 +195,10 @@ PAYMENT_DEFAULT_GATEWAY = config("PAYMENT_DEFAULT_GATEWAY", default="paystack")
 
 # Comma-separated Google OAuth client IDs (Android, iOS, Web). Get from Google Cloud Console.
 GOOGLE_CLIENT_IDS = config("GOOGLE_CLIENT_IDS", default="")
+
+# Public base URL of this backend, used to build absolute asset URLs (e.g. the
+# logo embedded in transactional emails) that must resolve outside our own domain.
+APP_URL = config("APP_URL", default="https://jaramarket-backend.onrender.com")
 
 # ── Email (console backend by default; set EMAIL_* in .env for real SMTP) ──
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")

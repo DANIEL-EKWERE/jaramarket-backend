@@ -1,0 +1,50 @@
+{% extends "webadmin/base.html" %}
+{% block page_title %}{% if ad %}Edit Advertisement{% else %}New Advertisement{% endif %}{% endblock %}
+{% block content %}
+<div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="w-full px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div>
+            <div class="breadcrumb"><a href="{% url 'webadmin:advertisements_list' %}" class="hover:text-emerald-600">Advertisements</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">{% if ad %}Edit{% else %}New{% endif %}</span></div>
+            <h1 class="page-title">{% if ad %}Edit Advertisement{% else %}New Advertisement{% endif %}</h1>
+        </div>
+        <a href="{% url 'webadmin:advertisements_list' %}" class="btn-secondary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Back
+        </a>
+    </div>
+</div>
+
+<div class="w-full px-6 lg:px-8 py-6">
+    <div class="card p-6 max-w-lg">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div>
+                <label>Type</label>
+                <select name="type">
+                    <option value="discount" {% if ad.type == "discount" %}selected{% endif %}>Discount</option>
+                    <option value="off" {% if ad.type == "off" %}selected{% endif %}>Off</option>
+                    <option value="info" {% if ad.type == "info" %}selected{% endif %}>Info</option>
+                </select>
+            </div>
+            <div><label>Value</label><input type="number" step="0.01" name="value" value="{{ ad.value|default:'' }}"></div>
+            <div>
+                <label>Ingredient IDs</label>
+                <input type="text" name="ingredient_ids" value="{{ ad.ingredient_ids|join:',' }}" placeholder="e.g. 3,7,12">
+                <p class="text-xs text-slate-400 mt-1">Comma-separated ingredient IDs this advertisement applies to.</p>
+            </div>
+            <div>
+                <label>Status</label>
+                <select name="status">
+                    <option value="active" {% if ad.status == "active" %}selected{% endif %}>Active</option>
+                    <option value="stop" {% if ad.status == "stop" %}selected{% endif %}>Stop</option>
+                </select>
+            </div>
+            <div><label>Image URL</label><input type="text" name="image" value="{{ ad.image|default:'' }}"></div>
+            <div class="flex gap-2 pt-2">
+                <button type="submit" class="btn-primary">Save</button>
+                <a href="{% url 'webadmin:advertisements_list' %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

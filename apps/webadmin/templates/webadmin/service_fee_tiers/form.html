@@ -1,0 +1,42 @@
+{% extends "webadmin/base.html" %}
+{% block page_title %}{% if tier %}Edit Service Fee Tier{% else %}New Service Fee Tier{% endif %}{% endblock %}
+{% block content %}
+<div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="w-full px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div>
+            <div class="breadcrumb"><a href="{% url 'webadmin:service_fee_tiers_list' %}" class="hover:text-emerald-600">Service Fee Tiers</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">{% if tier %}Edit{% else %}New{% endif %}</span></div>
+            <h1 class="page-title">{% if tier %}Edit Service Fee Tier{% else %}New Service Fee Tier{% endif %}</h1>
+        </div>
+        <a href="{% url 'webadmin:service_fee_tiers_list' %}" class="btn-secondary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Back
+        </a>
+    </div>
+</div>
+
+<div class="w-full px-6 lg:px-8 py-6">
+    <div class="card p-6 max-w-lg">
+        <form method="post" class="space-y-4">
+            {% csrf_token %}
+            <div><label>Min Amount (₦)</label><input type="number" step="0.01" name="min_amount" value="{{ tier.min_amount|default:0 }}"></div>
+            <div><label>Max Amount (₦) <span class="text-slate-400 font-normal">(blank = no limit, top tier)</span></label><input type="number" step="0.01" name="max_amount" value="{{ tier.max_amount|default:'' }}"></div>
+            <div>
+                <label>Fee Type</label>
+                <select name="fee_type">
+                    <option value="flat" {% if tier.fee_type == "flat" %}selected{% endif %}>Flat (₦)</option>
+                    <option value="percentage" {% if tier.fee_type == "percentage" or not tier %}selected{% endif %}>Percentage (%)</option>
+                </select>
+            </div>
+            <div>
+                <label>Value <span class="text-red-500">*</span></label>
+                <input type="number" step="0.01" name="value" value="{{ tier.value|default:'' }}" required>
+                <p class="text-xs text-slate-400 mt-1">Flat naira amount, or percentage number (e.g. 10 for 10%), depending on Fee Type above.</p>
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button type="submit" class="btn-primary">Save</button>
+                <a href="{% url 'webadmin:service_fee_tiers_list' %}" class="btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

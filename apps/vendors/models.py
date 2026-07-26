@@ -31,6 +31,10 @@ class StateRepresentative(TimestampedModel):
                              db_column="user_id", related_name="state_representative")
     state = models.ForeignKey("geo.State", on_delete=models.CASCADE,
                               db_column="state_id", related_name="representatives")
+    phone = models.CharField(max_length=20, null=True, blank=True)
+    lga = models.CharField(max_length=255, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
 
     class Meta:
         db_table = "state_representatives"

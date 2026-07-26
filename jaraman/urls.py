@@ -15,6 +15,7 @@ def health_check(request):
 urlpatterns = [
     path("", health_check),                           # Render / load-balancer health probe
     path("admin/", admin.site.urls),                 # Django admin = drop-in for the Blade admin panel
+    path("dashboard/", include("apps.webadmin.urls")),  # server-rendered admin dashboard
     path("jaram/", include("api.urls")),             # matches Laravel Route::prefix('jaram')
     path("api/jaram/", include("api.urls")),          # also available under /api for gateways/proxies
     path("jaram/token/refresh", TokenRefreshView.as_view()),  # JWT refresh

@@ -1,0 +1,11 @@
+{% if page.paginator.num_pages > 1 %}
+<div class="px-6 py-4 border-t border-slate-100 flex items-center justify-between">
+    <p class="text-xs text-slate-400">Page {{ page.number }} of {{ page.paginator.num_pages }}</p>
+    <div class="flex gap-2">
+        <a href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={% if page.has_previous %}{{ page.previous_page_number }}{% else %}1{% endif %}"
+           class="px-3 py-1.5 text-xs font-medium rounded-lg border {% if not page.has_previous %}text-slate-300 border-slate-100 pointer-events-none{% else %}text-slate-600 border-slate-200 hover:bg-slate-50{% endif %}">Previous</a>
+        <a href="?{% for k, v in request.GET.items %}{% if k != 'page' %}{{ k }}={{ v }}&{% endif %}{% endfor %}page={% if page.has_next %}{{ page.next_page_number }}{% else %}{{ page.number }}{% endif %}"
+           class="px-3 py-1.5 text-xs font-medium rounded-lg border {% if not page.has_next %}text-slate-300 border-slate-100 pointer-events-none{% else %}text-slate-600 border-slate-200 hover:bg-slate-50{% endif %}">Next</a>
+    </div>
+</div>
+{% endif %}

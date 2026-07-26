@@ -1,0 +1,2 @@
+/* Small overrides on top of Bootstrap defaults — most styling lives inline in base.html */
+.table-responsive { border-radius: .5rem; overflow: hidden; }

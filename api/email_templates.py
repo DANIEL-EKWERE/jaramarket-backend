@@ -1,7 +1,9 @@
 """HTML email builder for all transactional emails."""
+from django.conf import settings
 
 BRAND_COLOR = "#2E7D32"
 BRAND_NAME = "Jaramarket"
+LOGO_URL = f"{settings.APP_URL}/static/email/jaramarket_logo.png"
 
 
 def _base(title, content_html):
@@ -18,8 +20,8 @@ def _base(title, content_html):
     <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:8px;overflow:hidden;max-width:600px;width:100%;">
       <!-- Header -->
       <tr>
-        <td style="background:{BRAND_COLOR};padding:24px 32px;text-align:center;">
-          <h1 style="color:#ffffff;margin:0;font-size:24px;letter-spacing:1px;">{BRAND_NAME}</h1>
+        <td style="background:#ffffff;padding:24px 32px 16px;text-align:center;border-bottom:3px solid {BRAND_COLOR};">
+          <img src="{LOGO_URL}" alt="{BRAND_NAME}" width="140" style="display:block;margin:0 auto;max-width:140px;height:auto;"/>
         </td>
       </tr>
       <!-- Body -->
