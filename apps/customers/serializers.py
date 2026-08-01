@@ -13,12 +13,18 @@ class AddressSerializer(serializers.ModelSerializer):
     lga_id = serializers.PrimaryKeyRelatedField(
         queryset=Lga.objects.all(), source="lga"
     )
+    # Required on creation (not on partial updates) — orders can't be routed
+    # to the closest market without a location, so checkout is blocked until
+    # the app supplies device geolocation for the address.
+    latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=True)
+    longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=True)
 
     class Meta:
         model = Address
         fields = [
             "id", "user_id", "country_id", "state_id", "lga_id",
-            "contact_address", "phone_number", "is_default", "created_at", "updated_at",
+            "contact_address", "phone_number", "is_default", "latitude", "longitude",
+            "created_at", "updated_at",
         ]
         read_only_fields = ["user_id"]
 

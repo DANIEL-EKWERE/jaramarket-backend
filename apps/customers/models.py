@@ -14,6 +14,8 @@ class Address(TimestampedModel):
     contact_address = models.TextField(null=True, blank=True)
     phone_number = models.CharField(max_length=255, null=True, blank=True)
     is_default = models.BooleanField(default=False)
+    latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
 
     class Meta:
         db_table = "addresses"

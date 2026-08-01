@@ -69,28 +69,53 @@
     </div>
     {% endif %}
 
-    {% if recent_orders %}
-    <div class="card p-0 overflow-hidden">
-        <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
-            <h2 class="text-sm font-semibold text-slate-900">Recent Orders</h2>
-        </div>
-        <div class="divide-y divide-slate-100">
-            {% for order in recent_orders %}
-            <div class="flex items-center justify-between px-5 py-3 hover:bg-slate-50">
-                <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">{{ order.user.firstname|slice:":1"|upper|default:"U" }}</div>
-                    <div>
-                        <p class="text-sm font-medium text-slate-900">{{ order.user.name|default:"N/A" }}</p>
-                        <p class="text-xs text-slate-400">#{{ order.reference }}</p>
+    {% if recent_orders or latest_users %}
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {% if recent_orders %}
+        <div class="card p-0 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 class="text-sm font-semibold text-slate-900">Recent Orders</h2>
+            </div>
+            <div class="divide-y divide-slate-100">
+                {% for order in recent_orders %}
+                <div class="flex items-center justify-between px-5 py-3 hover:bg-slate-50">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 text-xs font-bold">{{ order.user.firstname|slice:":1"|upper|default:"U" }}</div>
+                        <div>
+                            <p class="text-sm font-medium text-slate-900">{{ order.user.name|default:"N/A" }}</p>
+                            <p class="text-xs text-slate-400">#{{ order.reference }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-semibold text-slate-900">₦{{ order.total }}</p>
+                        <span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' %}info{% elif order.status == 'completed' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span>
                     </div>
                 </div>
-                <div class="text-right">
-                    <p class="text-sm font-semibold text-slate-900">₦{{ order.total }}</p>
-                    <span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' %}info{% elif order.status == 'completed' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span>
-                </div>
+                {% endfor %}
             </div>
-            {% endfor %}
         </div>
+        {% endif %}
+
+        {% if latest_users %}
+        <div class="card p-0 overflow-hidden">
+            <div class="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+                <h2 class="text-sm font-semibold text-slate-900">New Customers</h2>
+                <a href="{% url 'webadmin:users_list' %}" class="text-xs text-green-600 hover:underline font-medium">View all</a>
+            </div>
+            <div class="divide-y divide-slate-100">
+                {% for u in latest_users %}
+                <div class="flex items-center gap-3 px-5 py-3 hover:bg-slate-50">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold">{{ u.firstname|slice:":1"|upper }}</div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-slate-900 truncate">{{ u.name }}</p>
+                        <p class="text-xs text-slate-400">{{ u.created_at|timesince }} ago</p>
+                    </div>
+                    <span class="w-2 h-2 rounded-full flex-shrink-0 {% if u.is_active %}bg-emerald-400{% else %}bg-slate-300{% endif %}"></span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
     </div>
     {% endif %}
 

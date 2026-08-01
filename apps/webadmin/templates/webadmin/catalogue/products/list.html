@@ -1,4 +1,5 @@
 {% extends "webadmin/base.html" %}
+{% load webadmin_extras %}
 {% block page_title %}Products{% endblock %}
 {% block content %}
 <div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -18,17 +19,30 @@
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Name</th><th>Price</th><th>Stock</th><th>Categories</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>Image</th><th>Name</th><th>Price</th><th>Stock</th><th>Categories</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for p in page %}
                     <tr>
+                        <td>
+                            {% if p.image_url %}
+                            <img src="{{ p.image_url|full_image_url }}" class="w-12 h-12 rounded-lg object-cover" alt="">
+                            {% else %}
+                            <div class="w-12 h-12 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                            </div>
+                            {% endif %}
+                        </td>
                         <td class="font-medium text-slate-800">{{ p.name }}</td>
                         <td class="font-mono">₦{{ p.price }}{% if p.discount_price %} <span class="text-slate-400 line-through text-xs">₦{{ p.discount_price }}</span>{% endif %}</td>
                         <td class="text-slate-500">{{ p.stock }}</td>
                         <td>{% for c in p.categories.all %}<span class="badge-info">{{ c.name }}</span> {% endfor %}</td>
+                        <td><span class="badge-{% if p.is_active %}success{% else %}danger{% endif %}">{% if p.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{% url 'webadmin:product_update' p.id %}" class="btn-edit">Edit</a>
+                                <form method="post" action="{% url 'webadmin:product_toggle_status' p.id %}" class="inline">
+                                    {% csrf_token %}<button class="btn-edit">{% if p.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                                </form>
                                 <form method="post" action="{% url 'webadmin:product_delete' p.id %}" class="inline" data-confirm="Delete this product?">
                                     {% csrf_token %}<button class="btn-danger-soft">Delete</button>
                                 </form>
@@ -36,7 +50,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="5" class="text-center text-slate-400 py-12">No products found.</td></tr>
+                    <tr><td colspan="7" class="text-center text-slate-400 py-12">No products found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -17,7 +17,7 @@
 <div class="w-full px-6 lg:px-8 py-6">
     <div class="card p-6 max-w-lg">
         {% if not rep %}
-        <p class="text-xs text-slate-400 mb-4">A new user account is created for this representative with a random password.</p>
+        <p class="text-xs text-slate-400 mb-4">A new user account is created for this representative with the password you set below -- they'll use it to log in.</p>
         {% endif %}
         <form method="post" class="space-y-4">
             {% csrf_token %}
@@ -25,6 +25,10 @@
             <div><label>Last name <span class="text-red-500">*</span></label><input type="text" name="lastname" value="{{ rep.user.lastname|default:'' }}" required></div>
             <div><label>Email <span class="text-red-500">*</span></label><input type="email" name="email" value="{{ rep.user.email|default:'' }}" required></div>
             <div><label>Phone <span class="text-red-500">*</span></label><input type="text" name="phone" value="{{ rep.phone|default:'' }}" required></div>
+            <div>
+                <label>{% if rep %}New Password <span class="text-slate-400 font-normal">(leave blank to keep unchanged)</span>{% else %}Password <span class="text-red-500">*</span>{% endif %}</label>
+                <input type="password" name="password" {% if not rep %}required{% endif %}>
+            </div>
             <div>
                 <label>State <span class="text-red-500">*</span></label>
                 <select name="state_id" required>

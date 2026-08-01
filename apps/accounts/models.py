@@ -29,13 +29,15 @@ class Roles:
         "view_service_fees", "manage_service_fees",
         "view_franchises", "manage_franchises",
         "view_representatives", "manage_representatives",
+        "view_markets", "manage_markets",
     ]
     DEFAULT_PERMISSIONS = {
         STATE_ADMIN: ["view_dashboard", "view_orders", "manage_orders", "view_users", "manage_users",
                       "view_vendors", "manage_vendors", "view_transactions", "view_reports",
                       "view_logistics", "view_categories", "view_products", "view_ingredients"],
         VENDOR_MANAGER: ["view_dashboard", "view_vendors", "manage_vendors", "view_orders", "manage_orders",
-                         "view_reports", "view_logistics", "view_categories", "view_products", "view_ingredients"],
+                         "view_reports", "view_logistics", "view_categories", "view_products", "manage_products",
+                         "view_ingredients", "view_markets", "manage_markets"],
         ACCOUNTS: ["view_dashboard", "view_transactions", "view_wallets", "manage_withdrawals", "view_reports"],
         AUDIT: ["view_transactions", "view_wallets", "view_reports", "view_orders"],
         LOGISTICS: ["view_orders", "manage_orders", "view_logistics"],

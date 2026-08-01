@@ -90,6 +90,9 @@ class UserRegistrationService:
             if f in data and data[f] is not None:
                 setattr(user, f, data[f])
         user.save()
+        if user.role == Roles.VENDOR and data.get("market_id") is not None:
+            from apps.vendors.models import Vendor
+            Vendor.objects.update_or_create(user=user, defaults={"market_id": data["market_id"]})
         return user
 
 

@@ -1,4 +1,5 @@
 {% extends "webadmin/base.html" %}
+{% load webadmin_extras %}
 {% block page_title %}{% if ingredient %}Edit Ingredient{% else %}New Ingredient{% endif %}{% endblock %}
 {% block content %}
 <div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -15,7 +16,7 @@
 </div>
 
 <div class="w-full px-6 lg:px-8 py-6">
-    <div class="card p-6 max-w-lg">
+    <div class="card p-6 max-w-2xl">
         <form method="post" enctype="multipart/form-data" class="space-y-4">
             {% csrf_token %}
             <div><label>Name <span class="text-red-500">*</span></label><input type="text" name="name" value="{{ ingredient.name|default:'' }}" required></div>
@@ -41,7 +42,7 @@
                 <label>Ingredient Image</label>
                 <div id="image-dropzone" class="relative overflow-hidden border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors">
                     <input type="file" name="image_file" id="image-file-input" accept="image/*" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer">
-                    <img id="image-preview" src="{{ ingredient.image_url|default:'' }}" class="mx-auto max-h-40 rounded-lg object-cover {% if not ingredient.image_url %}hidden{% endif %}">
+                    <img id="image-preview" src="{{ ingredient.image_url|full_image_url|default:'' }}" class="mx-auto max-h-40 rounded-lg object-cover {% if not ingredient.image_url %}hidden{% endif %}">
                     <div id="image-placeholder" class="{% if ingredient.image_url %}hidden{% endif %}">
                         <svg class="w-10 h-10 mx-auto text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                         <p class="text-sm text-slate-500 mt-2">Drag &amp; drop an image here, or click to browse</p>
@@ -50,6 +51,81 @@
                     <p id="image-replace-hint" class="text-xs text-slate-400 mt-2 {% if not ingredient.image_url %}hidden{% endif %}">Click or drag a new image to replace</p>
                 </div>
             </div>
+
+            <div class="border-t border-slate-100 pt-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <label>State-Specific Prices</label>
+                        <p class="text-xs text-slate-400">Override the default price for individual states</p>
+                    </div>
+                    <button type="button" id="btn-add-state-price" class="btn-secondary text-xs px-3 py-1.5">+ Add State</button>
+                </div>
+                <div id="state-price-rows" class="space-y-2">
+                    {% for sp in state_prices %}
+                    <div class="state-price-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <select name="state_price_id">
+                            {% for s in states %}
+                            <option value="{{ s.id }}" {% if s.id == sp.state_id %}selected{% endif %}>{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="state_price_price" value="{{ sp.price }}" placeholder="Price">
+                        <input type="number" step="0.01" name="state_price_discount" value="{{ sp.discounted_price|default:'' }}" placeholder="Discount">
+                        <button type="button" class="remove-price-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <template id="state-price-row-tpl">
+                    <div class="state-price-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <select name="state_price_id">
+                            {% for s in states %}
+                            <option value="{{ s.id }}">{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="state_price_price" placeholder="Price">
+                        <input type="number" step="0.01" name="state_price_discount" placeholder="Discount">
+                        <button type="button" class="remove-price-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    </div>
+                </template>
+                <p id="state-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if state_prices %}hidden{% endif %}">No state overrides -- the default price above applies everywhere.</p>
+            </div>
+
+            <div class="border-t border-slate-100 pt-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div>
+                        <label>LGA-Specific Prices</label>
+                        <p class="text-xs text-slate-400">Override the price for individual LGAs (takes priority over state pricing)</p>
+                    </div>
+                    <button type="button" id="btn-add-lga-price" class="btn-secondary text-xs px-3 py-1.5">+ Add LGA</button>
+                </div>
+                <div id="lga-price-rows" class="space-y-2">
+                    {% for lp in lga_prices %}
+                    <div class="lga-price-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <select name="lga_price_id">
+                            {% for l in lgas %}
+                            <option value="{{ l.id }}" {% if l.id == lp.lga_id %}selected{% endif %}>{{ l.name }} ({{ l.state.name }})</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="lga_price_price" value="{{ lp.price }}" placeholder="Price">
+                        <input type="number" step="0.01" name="lga_price_discount" value="{{ lp.discounted_price|default:'' }}" placeholder="Discount">
+                        <button type="button" class="remove-price-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <template id="lga-price-row-tpl">
+                    <div class="lga-price-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <select name="lga_price_id">
+                            {% for l in lgas %}
+                            <option value="{{ l.id }}">{{ l.name }} ({{ l.state.name }})</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="lga_price_price" placeholder="Price">
+                        <input type="number" step="0.01" name="lga_price_discount" placeholder="Discount">
+                        <button type="button" class="remove-price-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    </div>
+                </template>
+                <p id="lga-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if lga_prices %}hidden{% endif %}">No LGA overrides -- state or default price applies.</p>
+            </div>
+
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save</button>
                 <a href="{% url 'webadmin:ingredients_list' %}" class="btn-secondary">Cancel</a>
@@ -99,6 +175,66 @@
                 }
             });
         })();
+
+        function initPriceRows(containerId, tplId, addBtnId, hintId, rowClass, selectName) {
+            var container = document.getElementById(containerId);
+            var tpl = document.getElementById(tplId);
+            var emptyHint = document.getElementById(hintId);
+            var addBtn = document.getElementById(addBtnId);
+            var totalOptions = tpl.content.querySelector('select').options.length;
+
+            // A state/LGA can only have one price row per ingredient, so once
+            // it's picked in one row it must be excluded from every other
+            // row's dropdown, and "+ Add" is disabled once all are used.
+            function sync() {
+                var rows = container.querySelectorAll('.' + rowClass);
+                var chosen = Array.prototype.map.call(rows, function (row) {
+                    return row.querySelector('select[name="' + selectName + '"]').value;
+                });
+                rows.forEach(function (row) {
+                    var select = row.querySelector('select[name="' + selectName + '"]');
+                    Array.prototype.forEach.call(select.options, function (opt) {
+                        opt.disabled = opt.value !== select.value && chosen.indexOf(opt.value) !== -1;
+                    });
+                });
+                emptyHint.classList.toggle('hidden', rows.length > 0);
+                var maxedOut = rows.length >= totalOptions;
+                addBtn.disabled = maxedOut;
+                addBtn.classList.toggle('opacity-50', maxedOut);
+                addBtn.classList.toggle('cursor-not-allowed', maxedOut);
+            }
+
+            addBtn.addEventListener('click', function () {
+                if (addBtn.disabled) return;
+                var usedBefore = Array.prototype.map.call(
+                    container.querySelectorAll('select[name="' + selectName + '"]'),
+                    function (s) { return s.value; }
+                );
+                var clone = tpl.content.cloneNode(true);
+                var newSelect = clone.querySelector('select[name="' + selectName + '"]');
+                // New rows always default to the browser's first option; if
+                // that's already used elsewhere, jump to the first free one
+                // instead of silently defaulting to a duplicate.
+                var firstFree = Array.prototype.find.call(newSelect.options, function (opt) {
+                    return usedBefore.indexOf(opt.value) === -1;
+                });
+                if (firstFree) newSelect.value = firstFree.value;
+                container.appendChild(clone);
+                sync();
+            });
+            container.addEventListener('click', function (e) {
+                if (e.target.classList.contains('remove-price-row')) {
+                    e.target.closest('.' + rowClass).remove();
+                    sync();
+                }
+            });
+            container.addEventListener('change', function (e) {
+                if (e.target.tagName === 'SELECT') sync();
+            });
+            sync();
+        }
+        initPriceRows('state-price-rows', 'state-price-row-tpl', 'btn-add-state-price', 'state-price-empty-hint', 'state-price-row', 'state_price_id');
+        initPriceRows('lga-price-rows', 'lga-price-row-tpl', 'btn-add-lga-price', 'lga-price-empty-hint', 'lga-price-row', 'lga_price_id');
         </script>
     </div>
 </div>

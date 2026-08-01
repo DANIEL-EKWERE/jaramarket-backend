@@ -2,6 +2,26 @@ from django.db import models
 from api.base import SoftDeleteModel, TimestampedModel
 
 
+class Market(TimestampedModel):
+    """A physical market location vendors are stationed at. Orders are routed
+    to the market closest to the buyer so delivery stays fast."""
+    name = models.CharField(max_length=255)
+    address = models.TextField(null=True, blank=True)
+    state = models.ForeignKey("geo.State", on_delete=models.SET_NULL, null=True, blank=True,
+                              db_column="state_id", related_name="markets")
+    lga = models.ForeignKey("geo.Lga", on_delete=models.SET_NULL, null=True, blank=True,
+                            db_column="lga_id", related_name="markets")
+    latitude = models.DecimalField(max_digits=10, decimal_places=7)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = "markets"
+
+    def __str__(self):
+        return self.name
+
+
 class Franchise(TimestampedModel):
     name = models.CharField(max_length=255)
     location = models.CharField(max_length=255)
@@ -20,6 +40,8 @@ class Vendor(SoftDeleteModel):
                                 db_column="user_id", related_name="vendor_profile")
     franchise = models.ForeignKey(Franchise, on_delete=models.SET_NULL, null=True, blank=True,
                                   db_column="franchise_id", related_name="vendors")
+    market = models.ForeignKey(Market, on_delete=models.SET_NULL, null=True, blank=True,
+                               db_column="market_id", related_name="vendors")
     is_active = models.BooleanField(default=True)
 
     class Meta:

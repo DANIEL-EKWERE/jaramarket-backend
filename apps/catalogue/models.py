@@ -44,6 +44,7 @@ class Product(TimestampedModel):
     preparation_steps = models.TextField(null=True, blank=True)
     rating = models.FloatField(null=True, blank=True)
     image_url = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
     categories = models.ManyToManyField(Category, through="CategoryProduct", related_name="products")
 
     class Meta:

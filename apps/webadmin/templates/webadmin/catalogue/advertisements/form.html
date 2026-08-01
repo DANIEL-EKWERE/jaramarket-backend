@@ -28,9 +28,13 @@
             </div>
             <div><label>Value</label><input type="number" step="0.01" name="value" value="{{ ad.value|default:'' }}"></div>
             <div>
-                <label>Ingredient IDs</label>
-                <input type="text" name="ingredient_ids" value="{{ ad.ingredient_ids|join:',' }}" placeholder="e.g. 3,7,12">
-                <p class="text-xs text-slate-400 mt-1">Comma-separated ingredient IDs this advertisement applies to.</p>
+                <label>Ingredients</label>
+                <select name="ingredient_ids" multiple size="8">
+                    {% for i in ingredients %}
+                    <option value="{{ i.id }}" {% if i.id in selected_ingredient_ids %}selected{% endif %}>{{ i.name }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple. For Discount/Off types, each selected ingredient's price is updated immediately on save.</p>
             </div>
             <div>
                 <label>Status</label>

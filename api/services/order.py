@@ -11,7 +11,7 @@ from apps.accounts.models import Roles
 from apps.catalogue.models import Ingredient, IngredientProduct, Product
 from apps.customers.models import Address
 from apps.finance.models import Commission, ServiceFeeTier, TransactionLog, Wallet
-from apps.orders.models import Order, OrderItem, OrderItemLog
+from apps.orders.models import MarketOfferResponse, Order, OrderItem, OrderItemLog
 from apps.support.models import Setting
 from ._base import ORDER_TYPE, USER_TYPE, _d, _setting
 
@@ -152,6 +152,8 @@ class OrderService:
             address = Address.objects.filter(id=data["address_id"], user=user).first()
             if not address:
                 raise ValueError("Invalid delivery address")
+        if not address or address.latitude is None or address.longitude is None:
+            raise ValueError("A delivery address with a location is required to place an order.")
 
         order = Order.objects.create(
             order_date=data.get("order_date") or timezone.now(),
@@ -169,24 +171,16 @@ class OrderService:
         self._save_food(data, order, user)
         self._save_ingredients(data, order, user)
 
-        from ..notifications import wallet_notification, order_placed_notification, new_order_notification
+        from ..notifications import wallet_notification, order_placed_notification
         wallet = Wallet.objects.filter(user=user).first()
         wallet_notification(user, "debit", total, wallet.balance if wallet else 0,
                             order.reference, f"Payment for Order #{order.reference}")
         order_placed_notification(user, order)
 
-        # Notify vendors whose categories match any ingredient in this order
-        from apps.accounts.models import User as _User
-        ingredient_cat_ids = set(
-            order.items.filter(ingredient__isnull=False)
-            .values_list("ingredient__category_id", flat=True)
-        )
-        if ingredient_cat_ids:
-            for vendor in _User.objects.filter(
-                role=Roles.VENDOR, is_active=True,
-                categories__id__in=ingredient_cat_ids
-            ).distinct():
-                new_order_notification(vendor, order)
+        # Route each item to the closest market that can fulfil it, and
+        # offer it to the eligible vendors stationed there.
+        from .dispatch import MarketDispatchService
+        MarketDispatchService().resolve(list(order.items.filter(ingredient__isnull=False)), address)
         return order
 
     def _get_bonuses(self, price, quantity, order, user):
@@ -257,16 +251,15 @@ class OrderService:
 
     # ── Vendor ──
     def available_orders(self, vendor):
-        qs = OrderItem.objects.filter(
-            status="pending", ingredient__isnull=False
-        ).select_related("ingredient", "product", "order__user")
-        if vendor.role != Roles.ADMIN:
-            cat_ids = list(vendor.categories.values_list("id", flat=True))
-            qs = qs.filter(ingredient__category_id__in=cat_ids)
-            rejected_item_ids = OrderItemLog.objects.filter(
-                vendor=vendor, status="rejected"
-            ).values_list("order_item_id", flat=True)
-            qs = qs.exclude(id__in=rejected_item_ids)
+        qs = OrderItem.objects.select_related("ingredient", "product", "order__user")
+        if vendor.role == Roles.ADMIN:
+            return qs.filter(status__in=["pending", "offered"]).order_by("-created_at")
+        # Only items currently offered to this vendor's market, where this
+        # vendor hasn't already responded — first to accept wins.
+        offered_item_ids = MarketOfferResponse.objects.filter(
+            vendor=vendor, decision="pending", attempt__status="offered"
+        ).values_list("attempt__order_item_id", flat=True)
+        qs = qs.filter(status="offered", id__in=offered_item_ids)
         return qs.order_by("-created_at")
 
     def my_orders(self, vendor):
@@ -282,26 +275,38 @@ class OrderService:
 
     @transaction.atomic
     def decide(self, vendor, item_id, data):
-        item = OrderItem.objects.filter(id=item_id).first()
+        item = OrderItem.objects.select_for_update().filter(id=item_id).first()
         if not item:
             raise ValueError("Order item not found")
         accepted = data.get("status") == "accepted"
-        vendor_id = vendor.id
-        if vendor.role == Roles.ADMIN and data.get("vendor_id"):
-            vendor_id = data["vendor_id"]
+        is_admin_override = vendor.is_admin() and data.get("vendor_id")
+        vendor_id = data["vendor_id"] if is_admin_override else vendor.id
 
         from ..notifications import order_status_notification, order_item_status_notification
 
+        # Self-service vendor offers are exclusive to whoever the market
+        # broadcast is currently live for. An admin manually assigning from
+        # the fallback queue bypasses this (there's no live offer by then).
+        attempt = item.market_attempts.filter(status="offered").order_by("-offered_at").first()
+        response = None
+        if not is_admin_override:
+            if item.vendor_id is not None or item.status != "offered":
+                raise ValueError("This order is no longer available.")
+            response = attempt.responses.filter(vendor_id=vendor_id).first() if attempt else None
+
         if not accepted:
-            # Rejected: log it against this vendor only, and leave the item
-            # pending and unassigned so other matching vendors can still
-            # pick it up. available_orders() excludes items a vendor has
-            # already rejected, so it won't boomerang back to them.
             OrderItemLog.objects.create(order_item=item, vendor_id=vendor_id,
                                         status="rejected", changed_at=timezone.now())
             if item.vendor_id == vendor_id:
                 item.vendor_id = None
                 item.save(update_fields=["vendor_id"])
+            if response:
+                response.decision = "declined"
+                response.decided_at = timezone.now()
+                response.save(update_fields=["decision", "decided_at"])
+            if attempt and not attempt.responses.filter(decision__in=["pending", "accepted"]).exists():
+                from .dispatch import MarketDispatchService
+                MarketDispatchService().escalate(item, "all_declined")
             return item
 
         item.status = "processing"
@@ -310,6 +315,14 @@ class OrderService:
         item.save(update_fields=["status", "vendor_id", "vendor_at"])
         OrderItemLog.objects.create(order_item=item, vendor_id=vendor_id,
                                     status="processing", changed_at=timezone.now())
+        if response:
+            response.decision = "accepted"
+            response.decided_at = timezone.now()
+            response.save(update_fields=["decision", "decided_at"])
+        if attempt:
+            attempt.status = "accepted"
+            attempt.resolved_at = timezone.now()
+            attempt.save(update_fields=["status", "resolved_at"])
         order_item_status_notification(item.order.user, item, "processing")
         order = item.order
         if order.items.exclude(status="processing").count() == 0:

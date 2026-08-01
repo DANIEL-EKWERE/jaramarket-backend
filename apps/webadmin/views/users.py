@@ -1,5 +1,9 @@
 """Mirrors users_list/user_update/user_toggle_status/user_destroy in
-api/admin_views.py."""
+api/admin_views.py, plus create (UserController::create/store in the PHP
+admin, which api/admin_views.py never got an equivalent for)."""
+import random
+import string
+
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -8,6 +12,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from apps.accounts.models import Roles, User
+from apps.finance.models import Wallet
 from ..decorators import perm_required
 
 
@@ -25,6 +30,28 @@ def users_list_view(request):
     paginator = Paginator(qs, request.GET.get("per_page", 20))
     return render(request, "webadmin/users/list.html", {
         "page": paginator.get_page(request.GET.get("page")), "roles": Roles.CHOICES})
+
+
+@perm_required("manage_users")
+def user_create_view(request):
+    if request.method == "POST":
+        data = request.POST
+        if not all([data.get("firstname"), data.get("email"), data.get("password")]):
+            messages.error(request, "First name, email and password are required.")
+        elif User.all_objects.filter(email=data["email"]).exists():
+            messages.error(request, "Email already in use.")
+        else:
+            user = User(firstname=data["firstname"], lastname=data.get("lastname", ""),
+                        email=data["email"], phone_number=data.get("phone"),
+                        role=data.get("role") or Roles.CUSTOMER, is_active=True,
+                        email_verified_at=timezone.now(),
+                        referral_code="".join(random.choices(string.ascii_uppercase + string.digits, k=10)))
+            user.set_password(data["password"])
+            user.save()
+            Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+            messages.success(request, "User created successfully.")
+            return redirect("webadmin:users_list")
+    return render(request, "webadmin/users/form.html", {"roles": Roles.CHOICES})
 
 
 @perm_required("manage_users")

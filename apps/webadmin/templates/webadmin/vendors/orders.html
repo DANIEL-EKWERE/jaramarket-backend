@@ -1,0 +1,55 @@
+{% extends "webadmin/base.html" %}
+{% block page_title %}{{ vendor.name }} — Orders{% endblock %}
+{% block content %}
+<div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="w-full px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div>
+            <div class="breadcrumb"><a href="{% url 'webadmin:vendors_list' %}" class="hover:text-emerald-600">Vendors</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><a href="{% url 'webadmin:vendor_detail' vendor.id %}" class="hover:text-emerald-600">{{ vendor.name }}</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">Orders</span></div>
+            <h1 class="page-title">{{ vendor.name }} — Orders</h1>
+        </div>
+        <a href="{% url 'webadmin:vendor_detail' vendor.id %}" class="btn-secondary">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            Back to Vendor
+        </a>
+    </div>
+</div>
+
+<div class="w-full px-6 lg:px-8 py-6 space-y-5">
+    <form class="flex flex-wrap items-center gap-3">
+        <div class="w-44">
+            <select name="status">
+                <option value="">All statuses</option>
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if status == s %}selected{% endif %}>{{ s|title }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn-primary">Filter</button>
+    </form>
+
+    <div class="card overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="admin-table w-full">
+                <thead><tr><th>Order Ref</th><th>Customer</th><th>Item</th><th>Qty</th><th>Amount</th><th>Status</th><th>Date</th><th class="text-right">Actions</th></tr></thead>
+                <tbody class="divide-y divide-slate-50">
+                {% for item in page %}
+                    <tr>
+                        <td class="font-mono text-xs text-slate-500">{{ item.order.reference }}</td>
+                        <td class="text-slate-500">{{ item.order.user.name|default:"N/A" }}</td>
+                        <td class="font-medium text-slate-800">{% if item.ingredient %}{{ item.ingredient.name }}{% else %}—{% endif %}</td>
+                        <td>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
+                        <td class="font-mono">₦{{ item.amount }}</td>
+                        <td><span class="badge-{% if item.status == 'pending' %}warning{% elif item.status == 'processing' or item.status == 'accepted' or item.status == 'delivered' %}info{% elif item.status == 'completed' %}success{% else %}danger{% endif %}">{{ item.status|title }}</span></td>
+                        <td class="text-slate-400 text-xs">{{ item.created_at }}</td>
+                        <td class="text-right"><a href="{% url 'webadmin:order_detail' item.order_id %}" class="btn-edit">View Order</a></td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="8" class="text-center text-slate-400 py-12">No orders for this vendor yet.</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% include "webadmin/_pagination.html" %}
+    </div>
+</div>
+{% endblock %}

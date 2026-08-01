@@ -35,6 +35,11 @@
                                 <form method="post" action="{% url 'webadmin:admin_reset_permissions' a.id %}" class="inline" data-confirm="Reset this admin's permissions to role defaults?">
                                     {% csrf_token %}<button class="btn-edit">Reset Perms</button>
                                 </form>
+                                {% if a.id != request.user.id %}
+                                <form method="post" action="{% url 'webadmin:admin_delete' a.id %}" class="inline" data-confirm="Delete this admin? This cannot be undone.">
+                                    {% csrf_token %}<button class="btn-danger-soft">Delete</button>
+                                </form>
+                                {% endif %}
                             </div>
                         </td>
                     </tr>

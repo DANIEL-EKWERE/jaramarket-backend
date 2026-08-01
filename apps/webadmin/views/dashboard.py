@@ -43,6 +43,11 @@ def dashboard_view(request):
     if user.has_perm_slug("view_orders"):
         recent_orders = order_qs().select_related("user").order_by("-created_at")[:8]
 
+    latest_users = []
+    if user.has_perm_slug("view_users"):
+        cq = User.objects.customers()
+        latest_users = (cq.filter(state_id=state_id) if state_id else cq).order_by("-created_at")[:6]
+
     order_status_chart = {}
     if user.has_perm_slug("view_orders"):
         for row in order_qs().values("status").annotate(count=Count("id")):
@@ -54,6 +59,7 @@ def dashboard_view(request):
     return render(request, "webadmin/dashboard.html", {
         "stats": stats,
         "recent_orders": recent_orders,
+        "latest_users": latest_users,
         "order_status_chart": order_status_chart,
         "greeting": greeting,
     })

@@ -29,10 +29,12 @@ def _paginate(request, qs, serializer_cls):
             "per_page": p.page_size}
 
 
-# Mirrors App\Enums\CategoryTypeEnum::VENDOR in the PHP source (id=2, seeded
-# identically everywhere). Vendor-type categories are the ones a vendor picks
-# during onboarding; Food-type categories (id=1) are for the jara-user app's
-# recipe/product listings and must never be offered here.
+# Mirrors App\Enums\CategoryTypeEnum in the PHP source (FOOD=1, VENDOR=2,
+# seeded identically everywhere). Vendor-type categories are the ones a
+# vendor picks during onboarding, shared with Ingredients; Food-type
+# categories are the jara-user app's recipe/product listings. Each endpoint
+# below must only ever offer the type it actually owns.
+FOOD_CATEGORY_TYPE_ID = 1
 VENDOR_CATEGORY_TYPE_ID = 2
 
 
@@ -63,7 +65,7 @@ def categories_all_products(request):
     page     = int(request.query_params.get("page", 1))
     per_page = int(request.query_params.get("per_page", 5))
 
-    qs    = Category.objects.all().order_by("sort_by")
+    qs    = Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID).order_by("sort_by")
     total = qs.count()
     start = (page - 1) * per_page
     cats  = list(qs[start: start + per_page])
@@ -80,7 +82,7 @@ def categories_all_products(request):
     # Fetch ALL products for this page of categories in one query with all prefetches
     products_qs = (
         Product.objects
-        .filter(categories__id__in=cat_ids)
+        .filter(categories__id__in=cat_ids, is_active=True)
         .prefetch_related(
             Prefetch("state_prices", queryset=prod_state_qs, to_attr="_loc_state_prices"),
             Prefetch(
@@ -160,12 +162,12 @@ def categories_all_products(request):
 @api_view(["GET"])
 def categories_limit_products(request):
     limit = int(request.query_params.get("limit", 5))
-    cats = list(Category.objects.all().order_by("sort_by"))
+    cats = list(Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID).order_by("sort_by"))
     cat_ids = [c.id for c in cats]
 
     # Fetch all category→product links with ingredients prefetched (a few queries total)
     cp_qs = (CategoryProduct.objects
-             .filter(category_id__in=cat_ids)
+             .filter(category_id__in=cat_ids, product__is_active=True)
              .select_related("product")
              .prefetch_related(
                  Prefetch("product__ingredientproduct_set",
@@ -194,7 +196,7 @@ def fetch_ingredients(request):
 
 @api_view(["GET"])
 def fetch_product(request):
-    qs = Product.objects.all()
+    qs = Product.objects.filter(is_active=True)
     search = request.query_params.get("search")
     if search:
         qs = qs.filter(name__icontains=search)
@@ -208,7 +210,7 @@ def fetch_uom(request):
 
 @api_view(["GET"])
 def get_product_by_id(request, id):
-    obj = Product.objects.filter(id=id).first()
+    obj = Product.objects.filter(id=id, is_active=True).first()
     return success("Product retrieved", ProductSerializer(obj).data) if obj else error("Product not found", status=404)
 
 

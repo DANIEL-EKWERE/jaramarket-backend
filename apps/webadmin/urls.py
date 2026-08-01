@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     auth, dashboard, finance, vendors, users, admins, catalogue, commissions,
     reports, orders, settings_views, profile, notifications, franchises, representatives,
+    markets,
 )
 
 app_name = "webadmin"
@@ -27,11 +28,13 @@ urlpatterns = [
     # Vendors
     path("vendors", vendors.vendors_list_view, name="vendors_list"),
     path("vendors/<int:vendor_id>", vendors.vendor_detail_view, name="vendor_detail"),
+    path("vendors/<int:vendor_id>/orders", vendors.vendor_orders_view, name="vendor_orders"),
     path("vendors/<int:vendor_id>/toggle-status", vendors.vendor_toggle_status_view, name="vendor_toggle_status"),
     path("vendors/<int:vendor_id>/toggle-verification", vendors.vendor_toggle_verification_view, name="vendor_toggle_verification"),
 
     # Users
     path("users", users.users_list_view, name="users_list"),
+    path("users/create", users.user_create_view, name="user_create"),
     path("users/<int:user_id>", users.user_detail_view, name="user_detail"),
     path("users/<int:user_id>/toggle-status", users.user_toggle_status_view, name="user_toggle_status"),
     path("users/<int:user_id>/delete", users.user_delete_view, name="user_delete"),
@@ -42,6 +45,7 @@ urlpatterns = [
     path("admins/<int:admin_id>", admins.admin_update_view, name="admin_update"),
     path("admins/<int:admin_id>/toggle-status", admins.admin_toggle_status_view, name="admin_toggle_status"),
     path("admins/<int:admin_id>/reset-permissions", admins.admin_reset_permissions_view, name="admin_reset_permissions"),
+    path("admins/<int:admin_id>/delete", admins.admin_delete_view, name="admin_delete"),
 
     # My profile
     path("profile", profile.profile_view, name="profile"),
@@ -61,6 +65,7 @@ urlpatterns = [
     path("products", catalogue.products_list_view, name="products_list"),
     path("products/create", catalogue.product_create_view, name="product_create"),
     path("products/<int:id>", catalogue.product_update_view, name="product_update"),
+    path("products/<int:id>/toggle-status", catalogue.product_toggle_status_view, name="product_toggle_status"),
     path("products/<int:id>/delete", catalogue.product_delete_view, name="product_delete"),
 
     # Catalogue: ingredients
@@ -73,6 +78,7 @@ urlpatterns = [
     path("advertisements", catalogue.advertisements_list_view, name="advertisements_list"),
     path("advertisements/create", catalogue.advertisement_create_view, name="advertisement_create"),
     path("advertisements/<int:id>", catalogue.advertisement_update_view, name="advertisement_update"),
+    path("advertisements/<int:id>/toggle-status", catalogue.advertisement_toggle_status_view, name="advertisement_toggle_status"),
     path("advertisements/<int:id>/delete", catalogue.advertisement_delete_view, name="advertisement_delete"),
 
     # Commissions
@@ -99,6 +105,17 @@ urlpatterns = [
     path("representatives/<int:id>", representatives.representative_update_view, name="representative_update"),
     path("representatives/<int:id>/toggle-status", representatives.representative_toggle_status_view, name="representative_toggle_status"),
     path("representatives/<int:id>/delete", representatives.representative_delete_view, name="representative_delete"),
+
+    # Markets
+    path("markets", markets.markets_list_view, name="markets_list"),
+    path("markets/create", markets.market_create_view, name="market_create"),
+    path("markets/<int:id>", markets.market_update_view, name="market_update"),
+    path("markets/<int:id>/toggle-status", markets.market_toggle_status_view, name="market_toggle_status"),
+    path("markets/<int:id>/delete", markets.market_delete_view, name="market_delete"),
+
+    # Manual order-assignment queue (markets exhausted, needs a human)
+    path("orders/manual-queue", orders.orders_manual_queue_view, name="orders_manual_queue"),
+    path("orders/manual-queue/<int:item_id>/assign", orders.order_item_manual_assign_view, name="order_item_manual_assign"),
 
     # Settings
     path("settings", settings_views.settings_view, name="settings"),

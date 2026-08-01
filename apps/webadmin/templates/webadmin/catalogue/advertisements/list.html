@@ -28,6 +28,9 @@
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{% url 'webadmin:advertisement_update' ad.id %}" class="btn-edit">Edit</a>
+                                <form method="post" action="{% url 'webadmin:advertisement_toggle_status' ad.id %}" class="inline">
+                                    {% csrf_token %}<button class="btn-edit">{% if ad.status == "active" %}Stop{% else %}Activate{% endif %}</button>
+                                </form>
                                 <form method="post" action="{% url 'webadmin:advertisement_delete' ad.id %}" class="inline" data-confirm="Delete this advertisement?">
                                     {% csrf_token %}<button class="btn-danger-soft">Delete</button>
                                 </form>

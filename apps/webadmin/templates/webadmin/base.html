@@ -62,9 +62,13 @@
             </a>
 
             {% if request.user|has_perm_slug:"view_orders" %}
-            <a href="{% url 'webadmin:orders_list' %}" class="nav-link {% if 'order' in request.resolver_match.url_name %}active{% endif %}">
+            <a href="{% url 'webadmin:orders_list' %}" class="nav-link {% if request.resolver_match.url_name == 'orders_list' or request.resolver_match.url_name == 'order_detail' %}active{% endif %}">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                 Orders
+            </a>
+            <a href="{% url 'webadmin:orders_manual_queue' %}" class="nav-link {% if 'manual_queue' in request.resolver_match.url_name or 'manual_assign' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/></svg>
+                Manual Assignment
             </a>
             {% endif %}
 
@@ -94,7 +98,7 @@
             </a>
             {% endif %}
 
-            {% if request.user|has_any_perm:"view_users,view_vendors,view_franchises,view_representatives" %}
+            {% if request.user|has_any_perm:"view_users,view_vendors,view_franchises,view_representatives,view_markets" %}
             <p class="nav-section">People</p>
             {% if request.user|has_perm_slug:"view_users" %}
             <a href="{% url 'webadmin:users_list' %}" class="nav-link {% if 'user' in request.resolver_match.url_name %}active{% endif %}">
@@ -118,6 +122,12 @@
             <a href="{% url 'webadmin:representatives_list' %}" class="nav-link {% if 'representative' in request.resolver_match.url_name %}active{% endif %}">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 State Representatives
+            </a>
+            {% endif %}
+            {% if request.user|has_perm_slug:"view_markets" %}
+            <a href="{% url 'webadmin:markets_list' %}" class="nav-link {% if 'market' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                Markets
             </a>
             {% endif %}
             {% endif %}

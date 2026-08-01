@@ -149,6 +149,19 @@ def new_order_notification(vendor_user, order):
     return result
 
 
+def order_item_offer_notification(vendor_user, order_item, market):
+    msg = f"A new order item is available for pickup at {market.name}. First to accept gets it."
+    result = notify(vendor_user, "MarketOfferNotification", {
+        "type": "market_offer", "title": "New Order Available!",
+        "message": msg, "order_item_id": str(order_item.id), "market_id": str(market.id),
+    }, channels=("database", "fcm"))
+    if vendor_user.phone_number:
+        from .services.sms import Termii
+        Termii().send(vendor_user.phone_number,
+                      f"Jaramarket: a new order is available at {market.name}. Open the app to accept it.")
+    return result
+
+
 def otp_notification(user_email, otp, purpose="verify your email"):
     from .email_templates import otp_email
     html = otp_email(otp, purpose)

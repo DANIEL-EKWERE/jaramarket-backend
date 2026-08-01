@@ -37,6 +37,9 @@ class OrderItem(TimestampedModel):
                                db_column="vendor_id", related_name="vendor_order_items")
     vendor_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=255, default="pending")
+    market = models.ForeignKey("vendors.Market", on_delete=models.SET_NULL, null=True, blank=True,
+                               db_column="market_id", related_name="order_items")
+    offer_expires_at = models.DateTimeField(null=True, blank=True)
     assurance_user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, null=True, blank=True,
                                        db_column="assurance_user_id", related_name="qa_order_items")
     assurance_at = models.DateTimeField(null=True, blank=True)
@@ -66,3 +69,41 @@ class OrderItemLog(TimestampedModel):
 
     class Meta:
         db_table = "order_item_logs"
+
+
+class OrderItemMarketAttempt(TimestampedModel):
+    """One row per market an OrderItem's vendor-offer has been tried at —
+    the audit trail that also drives escalation (which markets are already
+    exhausted for this item)."""
+    STATUS_CHOICES = [
+        ("offered", "offered"),
+        ("accepted", "accepted"),
+        ("escalated_timeout", "escalated_timeout"),
+        ("escalated_all_declined", "escalated_all_declined"),
+        ("escalated_no_vendor", "escalated_no_vendor"),
+    ]
+    order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE,
+                                   db_column="order_item_id", related_name="market_attempts")
+    market = models.ForeignKey("vendors.Market", on_delete=models.CASCADE,
+                               db_column="market_id", related_name="order_attempts")
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default="offered")
+    offered_at = models.DateTimeField(auto_now_add=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "order_item_market_attempts"
+
+
+class MarketOfferResponse(TimestampedModel):
+    """One row per vendor notified within a market attempt — lets us tell
+    when every eligible vendor at that market has declined."""
+    DECISION_CHOICES = [("pending", "pending"), ("accepted", "accepted"), ("declined", "declined")]
+    attempt = models.ForeignKey(OrderItemMarketAttempt, on_delete=models.CASCADE,
+                                db_column="attempt_id", related_name="responses")
+    vendor = models.ForeignKey("accounts.User", on_delete=models.CASCADE, db_column="vendor_id")
+    decision = models.CharField(max_length=10, choices=DECISION_CHOICES, default="pending")
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = "market_offer_responses"
+        unique_together = (("attempt", "vendor"),)

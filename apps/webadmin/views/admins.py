@@ -77,3 +77,17 @@ def admin_reset_permissions_view(request, admin_id):
     admin.sync_default_permissions()
     messages.success(request, f"{admin.name}'s permissions reset to role defaults.")
     return redirect("webadmin:admins_list")
+
+
+@require_POST
+@perm_required("manage_admins")
+def admin_delete_view(request, admin_id):
+    admin = get_object_or_404(User, id=admin_id, role=Roles.ADMIN)
+    if admin.id == request.user.id:
+        messages.error(request, "You cannot delete yourself.")
+        return redirect("webadmin:admins_list")
+    admin.deleted_at = timezone.now()
+    admin.is_active = False
+    admin.save(update_fields=["deleted_at", "is_active"])
+    messages.success(request, f"{admin.name} deleted.")
+    return redirect("webadmin:admins_list")

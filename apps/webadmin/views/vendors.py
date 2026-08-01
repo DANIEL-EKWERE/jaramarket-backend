@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.models import Roles, User
 from apps.finance.models import Wallet
-from apps.orders.models import OrderItem
+from apps.orders.models import OrderItem, OrderItemLog
 from ..decorators import perm_required
 
 
@@ -50,6 +50,24 @@ def vendor_detail_view(request, vendor_id):
     return render(request, "webadmin/vendors/detail.html", {
         "vendor": v, "wallet_balance": wallet.balance if wallet else 0, "stats": stats,
         "categories": v.categories.all()})
+
+
+@perm_required("view_vendors")
+def vendor_orders_view(request, vendor_id):
+    """Mirrors VendorManagementController::vendorOrders in the PHP admin --
+    a per-vendor order-items list (not shown anywhere on vendor_detail_view,
+    which only has aggregate stats)."""
+    v = get_object_or_404(User, id=vendor_id, role=Roles.VENDOR)
+    qs = (OrderItem.objects.filter(vendor=v)
+          .select_related("order", "order__user", "order__address", "ingredient", "ingredient__category")
+          .order_by("-created_at"))
+    status = request.GET.get("status")
+    if status:
+        qs = qs.filter(status=status)
+    paginator = Paginator(qs, request.GET.get("per_page", 20))
+    return render(request, "webadmin/vendors/orders.html", {
+        "vendor": v, "page": paginator.get_page(request.GET.get("page")),
+        "status": status, "statuses": [s[0] for s in OrderItemLog.STATUS_CHOICES]})
 
 
 @require_POST

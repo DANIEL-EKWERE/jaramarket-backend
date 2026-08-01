@@ -10,7 +10,7 @@ from django.views.decorators.http import require_POST
 
 from api.services import OrderService
 from apps.accounts.models import Roles
-from apps.orders.models import Order
+from apps.orders.models import Order, OrderItem
 from ..decorators import perm_required
 
 _svc = OrderService()
@@ -62,3 +62,45 @@ def order_complete_view(request, order_id):
     except ValueError as e:
         messages.error(request, str(e))
     return redirect("webadmin:order_detail", order_id=order_id)
+
+
+@perm_required("view_orders")
+def orders_manual_queue_view(request):
+    """Order items every nearby market's vendors declined/timed out on (or
+    that had no eligible vendor at all) — flagged by MarketDispatchService
+    (re_assigned=True) for a human to assign directly."""
+    qs = (OrderItem.objects
+          .filter(re_assigned=True, vendor__isnull=True)
+          .select_related("ingredient", "product", "order__user")
+          .order_by("-created_at"))
+    paginator = Paginator(qs, request.GET.get("per_page", 20))
+    page = paginator.get_page(request.GET.get("page"))
+
+    from apps.accounts.models import User
+    vendors_by_category = {}
+    for item in page:
+        item.display_name = item.ingredient.name if item.ingredient_id else (
+            item.product.name if item.product_id else "—")
+        cat_id = item.ingredient.category_id if item.ingredient_id else None
+        if cat_id and cat_id not in vendors_by_category:
+            vendors_by_category[cat_id] = list(
+                User.objects.filter(role=Roles.VENDOR, is_active=True, categories__id=cat_id)
+                .distinct().order_by("firstname"))
+        item.candidate_vendors = vendors_by_category.get(cat_id, [])
+
+    return render(request, "webadmin/orders/manual_queue.html", {"page": page})
+
+
+@require_POST
+@perm_required("manage_orders")
+def order_item_manual_assign_view(request, item_id):
+    vendor_id = request.POST.get("vendor_id")
+    if not vendor_id:
+        messages.error(request, "Select a vendor to assign.")
+        return redirect("webadmin:orders_manual_queue")
+    try:
+        _svc.decide(request.user, item_id, {"status": "accepted", "vendor_id": vendor_id})
+        messages.success(request, "Order item assigned successfully.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect("webadmin:orders_manual_queue")

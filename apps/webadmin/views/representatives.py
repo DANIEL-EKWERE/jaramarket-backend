@@ -34,9 +34,9 @@ def representatives_list_view(request):
 def representative_create_view(request):
     if request.method == "POST":
         data = request.POST
-        required = ["firstname", "lastname", "email", "phone", "state_id", "lga", "address"]
+        required = ["firstname", "lastname", "email", "phone", "state_id", "lga", "address", "password"]
         if not all(data.get(f) for f in required):
-            messages.error(request, "All fields are required.")
+            messages.error(request, "All fields are required, including a password.")
         elif User.all_objects.filter(email=data["email"]).exists():
             messages.error(request, "Email already in use.")
         else:
@@ -44,7 +44,7 @@ def representative_create_view(request):
                         phone_number=data["phone"], role=Roles.STATE_REPRESENTATIVE, is_active=True,
                         email_verified_at=timezone.now(),
                         referral_code="".join(random.choices(string.ascii_uppercase + string.digits, k=10)))
-            user.set_password("".join(random.choices(string.ascii_letters + string.digits, k=12)))
+            user.set_password(data["password"])
             user.save()
             Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
             StateRepresentative.objects.create(user=user, state_id=data["state_id"], phone=data["phone"],
@@ -70,6 +70,8 @@ def representative_update_view(request, id):
             rep.user.lastname = data["lastname"]
             rep.user.email = data["email"]
             rep.user.phone_number = data["phone"]
+            if data.get("password"):
+                rep.user.set_password(data["password"])
             rep.user.save()
             rep.state_id = data["state_id"]
             rep.phone = data["phone"]
