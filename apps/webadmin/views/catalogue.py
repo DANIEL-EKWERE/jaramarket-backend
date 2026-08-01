@@ -149,10 +149,22 @@ def category_delete_view(request, id):
 
 @perm_required("view_products")
 def products_list_view(request):
-    qs = Product.objects.all().order_by("-created_at")
+    qs = Product.objects.all()
+    search = request.GET.get("search")
+    if search:
+        qs = qs.filter(name__icontains=search)
+    category_id = request.GET.get("category_id")
+    if category_id:
+        qs = qs.filter(categories__id=category_id)
+    if category_id or request.GET.get("sort") == "category":
+        qs = qs.prefetch_related("categories").order_by("categories__name", "name")
+    else:
+        qs = qs.order_by("-created_at")
+    qs = qs.distinct()
     paginator = Paginator(qs, request.GET.get("per_page", 20))
-    return render(request, "webadmin/catalogue/products/list.html",
-                  {"page": paginator.get_page(request.GET.get("page"))})
+    return render(request, "webadmin/catalogue/products/list.html", {
+        "page": paginator.get_page(request.GET.get("page")),
+        "categories": Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID).order_by("name")})
 
 
 @perm_required("manage_products")
@@ -231,10 +243,21 @@ def product_delete_view(request, id):
 
 @perm_required("view_ingredients")
 def ingredients_list_view(request):
-    qs = Ingredient.objects.select_related("category").order_by("-created_at")
+    qs = Ingredient.objects.select_related("category")
+    search = request.GET.get("search")
+    if search:
+        qs = qs.filter(name__icontains=search)
+    category_id = request.GET.get("category_id")
+    if category_id:
+        qs = qs.filter(category_id=category_id)
+    if category_id or request.GET.get("sort") == "category":
+        qs = qs.order_by("category__name", "name")
+    else:
+        qs = qs.order_by("-created_at")
     paginator = Paginator(qs, request.GET.get("per_page", 20))
-    return render(request, "webadmin/catalogue/ingredients/list.html",
-                  {"page": paginator.get_page(request.GET.get("page"))})
+    return render(request, "webadmin/catalogue/ingredients/list.html", {
+        "page": paginator.get_page(request.GET.get("page")),
+        "categories": Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID).order_by("name")})
 
 
 @perm_required("manage_ingredients")

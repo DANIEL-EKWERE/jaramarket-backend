@@ -1,6 +1,7 @@
 """Order service and transaction ledger."""
 import secrets
 import string
+from datetime import timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
@@ -63,6 +64,19 @@ def calculate_service_fee(subtotal):
     return (subtotal * _d(tier.value) / 100).quantize(Decimal("0.01"), ROUND_HALF_UP)
 
 
+def _get_wallet(user_id):
+    """Fetch a user's wallet, tolerating pre-existing duplicate rows (some
+    accounts have more than one Wallet row with no DB-level uniqueness
+    constraint ever enforced, e.g. from race conditions or the legacy data
+    import) -- get_or_create() would crash with MultipleObjectsReturned in
+    that case. Picks the oldest row deterministically rather than erroring;
+    it does not merge/delete the other duplicate rows' balances."""
+    wallet = Wallet.objects.filter(user_id=user_id).order_by("id").first()
+    if wallet is None:
+        wallet = Wallet.objects.create(user_id=user_id, balance=0)
+    return wallet
+
+
 class TransactionLogService:
     @staticmethod
     def _ref():
@@ -73,7 +87,7 @@ class TransactionLogService:
     def debit(cls, account_owner_id, account_owner_type, amount, owner_id=None,
               owner_type=None, currency="NGN", comment=None):
         amount = _d(amount)
-        wallet, _ = Wallet.objects.get_or_create(user_id=account_owner_id, defaults={"balance": 0})
+        wallet = _get_wallet(account_owner_id)
         old = _d(wallet.balance)
         new = old - amount
         wallet.balance = new
@@ -92,7 +106,7 @@ class TransactionLogService:
     def credit(cls, account_owner_id, account_owner_type, amount, owner_id=None,
                owner_type=None, currency="NGN", comment=None):
         amount = _d(amount)
-        wallet, _ = Wallet.objects.get_or_create(user_id=account_owner_id, defaults={"balance": 0})
+        wallet = _get_wallet(account_owner_id)
         old = _d(wallet.balance)
         new = old + amount
         wallet.balance = new
@@ -143,7 +157,7 @@ class OrderService:
         service_charge = calculate_service_fee(subtotal)
         total = subtotal + shipping_fee + vat + service_charge
 
-        wallet, _ = Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+        wallet = _get_wallet(user.id)
         if _d(wallet.balance) < total:
             raise ValueError("Insufficient wallet balance.")
 
@@ -178,9 +192,16 @@ class OrderService:
         order_placed_notification(user, order)
 
         # Route each item to the closest market that can fulfil it, and
-        # offer it to the eligible vendors stationed there.
-        from .dispatch import MarketDispatchService
-        MarketDispatchService().resolve(list(order.items.filter(ingredient__isnull=False)), address)
+        # offer it to the eligible vendors stationed there -- unless the
+        # order landed outside the dispatch window (default 09:00-18:30),
+        # in which case dispatch is deferred until it reopens.
+        from .dispatch import MarketDispatchService, next_dispatch_time
+        dispatch_at = next_dispatch_time()
+        if dispatch_at is None:
+            MarketDispatchService().resolve(list(order.items.filter(ingredient__isnull=False)), address)
+        else:
+            order.scheduled_dispatch_at = dispatch_at
+            order.save(update_fields=["scheduled_dispatch_at"])
         return order
 
     def _get_bonuses(self, price, quantity, order, user):
@@ -309,10 +330,12 @@ class OrderService:
                 MarketDispatchService().escalate(item, "all_declined")
             return item
 
+        from .dispatch import _delivery_timeout_minutes
         item.status = "processing"
         item.vendor_id = vendor_id
         item.vendor_at = timezone.now()
-        item.save(update_fields=["status", "vendor_id", "vendor_at"])
+        item.delivery_deadline = item.vendor_at + timedelta(minutes=_delivery_timeout_minutes())
+        item.save(update_fields=["status", "vendor_id", "vendor_at", "delivery_deadline"])
         OrderItemLog.objects.create(order_item=item, vendor_id=vendor_id,
                                     status="processing", changed_at=timezone.now())
         if response:
@@ -347,7 +370,8 @@ class OrderService:
             raise ValueError(f"Item cannot be marked delivered from status '{item.status}'.")
 
         item.status = "delivered"
-        item.save(update_fields=["status"])
+        item.delivery_deadline = None
+        item.save(update_fields=["status", "delivery_deadline"])
         OrderItemLog.objects.create(order_item=item, vendor_id=item.vendor_id,
                                     status="delivered", changed_at=timezone.now())
 

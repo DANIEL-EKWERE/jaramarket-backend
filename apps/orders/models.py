@@ -18,6 +18,7 @@ class Order(SoftDeleteModel):
     status = models.CharField(max_length=255, default="pending")
     meal_prep = models.TextField(null=True, blank=True)
     reference = models.CharField(max_length=255, null=True, blank=True)
+    scheduled_dispatch_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         db_table = "orders"
@@ -40,6 +41,7 @@ class OrderItem(TimestampedModel):
     market = models.ForeignKey("vendors.Market", on_delete=models.SET_NULL, null=True, blank=True,
                                db_column="market_id", related_name="order_items")
     offer_expires_at = models.DateTimeField(null=True, blank=True)
+    delivery_deadline = models.DateTimeField(null=True, blank=True)
     assurance_user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, null=True, blank=True,
                                        db_column="assurance_user_id", related_name="qa_order_items")
     assurance_at = models.DateTimeField(null=True, blank=True)
@@ -60,7 +62,8 @@ class OrderItem(TimestampedModel):
 class OrderItemLog(TimestampedModel):
     STATUS_CHOICES = [("accepted", "accepted"), ("processing", "processing"),
                       ("completed", "completed"), ("pending", "pending"), ("cancelled", "cancelled"),
-                      ("rejected", "rejected"), ("delivered", "delivered")]
+                      ("rejected", "rejected"), ("delivered", "delivered"),
+                      ("delivery_timeout", "delivery_timeout")]
     order_item = models.ForeignKey(OrderItem, on_delete=models.CASCADE,
                                    db_column="order_item_id", related_name="logs")
     vendor = models.ForeignKey("accounts.User", on_delete=models.CASCADE, db_column="vendor_id")

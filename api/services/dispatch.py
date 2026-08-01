@@ -8,7 +8,7 @@ vendor available at all). Falls back to the manual-assignment queue once
 every market has been tried.
 """
 import math
-from datetime import timedelta
+from datetime import datetime, timedelta
 
 from django.utils import timezone
 
@@ -18,12 +18,37 @@ from apps.vendors.models import Market
 from ._base import _setting
 
 
+def _dispatch_cutoff_time():
+    return datetime.strptime(_setting("order_dispatch_cutoff_time", "18:30") or "18:30", "%H:%M").time()
+
+
+def _dispatch_resume_time():
+    return datetime.strptime(_setting("order_dispatch_resume_time", "09:00") or "09:00", "%H:%M").time()
+
+
+def next_dispatch_time(now=None):
+    """None if `now` falls inside the dispatch window (dispatch immediately);
+    otherwise the next datetime dispatch resumes at (defer until then) --
+    orders placed at/after the cutoff (18:30 by default) wait until the
+    resume time (09:00) the same or next day."""
+    now = now or timezone.localtime(timezone.now())
+    cutoff, resume = _dispatch_cutoff_time(), _dispatch_resume_time()
+    if resume <= now.time() < cutoff:
+        return None
+    resume_dt = now.replace(hour=resume.hour, minute=resume.minute, second=0, microsecond=0)
+    return resume_dt if now.time() < resume else resume_dt + timedelta(days=1)
+
+
 def _coverage_threshold():
     return float(_setting("market_coverage_threshold", 0.8) or 0.8)
 
 
 def _offer_timeout_minutes():
     return int(_setting("market_offer_timeout_minutes", 30) or 30)
+
+
+def _delivery_timeout_minutes():
+    return int(_setting("vendor_delivery_timeout_minutes", 20) or 20)
 
 
 def haversine_km(lat1, lng1, lat2, lng2):
@@ -83,10 +108,11 @@ class MarketDispatchService:
                 return
         self._send_to_manual_queue(items)
 
-    def offer_to_market(self, item, market):
+    def offer_to_market(self, item, market, exclude_vendor_ids=()):
         from api.notifications import order_item_offer_notification
 
-        eligible = list(self.eligible_vendors(market, item.ingredient.category_id))
+        eligible = list(self.eligible_vendors(market, item.ingredient.category_id)
+                        .exclude(id__in=exclude_vendor_ids))
         attempt = OrderItemMarketAttempt.objects.create(order_item=item, market=market, status="offered")
         MarketOfferResponse.objects.bulk_create(
             [MarketOfferResponse(attempt=attempt, vendor=v) for v in eligible]
@@ -119,6 +145,33 @@ class MarketDispatchService:
                 self.offer_to_market(item, market)
                 return
         self._send_to_manual_queue([item])
+
+    def reopen_after_delivery_timeout(self, item):
+        """A vendor accepted but didn't mark the item delivered within the
+        delivery window -- pull it back from them and put it in front of
+        other vendors again: same market first (excluding the vendor who
+        missed it), escalating outward only if nobody else is there."""
+        from apps.orders.models import OrderItemLog
+
+        failed_vendor_id = item.vendor_id
+        if failed_vendor_id:
+            OrderItemLog.objects.create(order_item=item, vendor_id=failed_vendor_id,
+                                        status="delivery_timeout", changed_at=timezone.now())
+        item.vendor_id = None
+        item.vendor_at = None
+        item.delivery_deadline = None
+
+        market = item.market
+        if market and item.ingredient_id and self.eligible_vendors(
+                market, item.ingredient.category_id).exclude(id=failed_vendor_id).exists():
+            item.save(update_fields=["vendor_id", "vendor_at", "delivery_deadline"])
+            exclude = {failed_vendor_id} if failed_vendor_id else ()
+            self.offer_to_market(item, market, exclude_vendor_ids=exclude)
+            return
+
+        item.status = "pending"
+        item.save(update_fields=["vendor_id", "vendor_at", "delivery_deadline", "status"])
+        self.escalate(item, "delivery_timeout")
 
     def _send_to_manual_queue(self, items):
         for item in items:

@@ -215,6 +215,7 @@ def get_product_by_id(request, id):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def fetch_adverts(request):
     return success("Advertisements retrieved",
                    AdvertisementSerializer(Advertisement.objects.filter(status="active"), many=True).data)

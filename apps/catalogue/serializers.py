@@ -85,6 +85,11 @@ class ProductSerializer(serializers.ModelSerializer):
 
 
 class AdvertisementSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Advertisement
         fields = ["id", "type", "value", "status", "image", "ingredient_ids", "created_at"]
+
+    def get_image(self, obj):
+        return _full_image_url(obj.image)
