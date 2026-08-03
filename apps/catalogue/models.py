@@ -60,6 +60,13 @@ class Product(TimestampedModel):
                 return {"price": sp.price, "discount_price": sp.discount_price, "price_source": "state"}
         return {"price": self.price, "discount_price": self.discount_price, "price_source": "default"}
 
+    def is_suspended_in(self, state_id=None, lga_id=None):
+        if state_id and self.state_suspensions.filter(state_id=state_id).exists():
+            return True
+        if lga_id and self.lga_suspensions.filter(lga_id=lga_id).exists():
+            return True
+        return False
+
 
 class CategoryProduct(TimestampedModel):
     category = models.ForeignKey(Category, on_delete=models.CASCADE, db_column="category_id")
@@ -98,6 +105,7 @@ class Ingredient(TimestampedModel):
     unit = models.CharField(max_length=20)
     stock = models.IntegerField(default=0)
     image_url = models.CharField(max_length=255, null=True, blank=True)
+    is_active = models.BooleanField(default=True)
     products = models.ManyToManyField(Product, through="IngredientProduct", related_name="ingredients")
 
     class Meta:
@@ -120,6 +128,13 @@ class Ingredient(TimestampedModel):
             if sp:
                 return {"price": sp.price, "discounted_price": sp.discounted_price, "price_source": "state"}
         return {"price": self.price, "discounted_price": self.discounted_price, "price_source": "default"}
+
+    def is_suspended_in(self, state_id=None, lga_id=None):
+        if state_id and self.state_suspensions.filter(state_id=state_id).exists():
+            return True
+        if lga_id and self.lga_suspensions.filter(lga_id=lga_id).exists():
+            return True
+        return False
 
 
 class IngredientProduct(TimestampedModel):
@@ -162,4 +177,46 @@ class IngredientLgaPrice(TimestampedModel):
 
     class Meta:
         db_table = "ingredient_lga_prices"
+        unique_together = (("ingredient", "lga"),)
+
+
+# ── Location-scoped suspension ──────────────────────────────────────────────
+# A product/ingredient stays globally active (is_active=True) but can be
+# blocked from showing up in specific states/LGAs -- row existence means
+# "suspended here". Admin's previous only option was the global is_active
+# toggle, which suspended an item everywhere at once.
+
+class ProductStateSuspension(TimestampedModel):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="state_suspensions")
+    state = models.ForeignKey("geo.State", on_delete=models.CASCADE, db_column="state_id")
+
+    class Meta:
+        db_table = "product_state_suspensions"
+        unique_together = (("product", "state"),)
+
+
+class ProductLgaSuspension(TimestampedModel):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="lga_suspensions")
+    lga = models.ForeignKey("geo.Lga", on_delete=models.CASCADE, db_column="lga_id")
+
+    class Meta:
+        db_table = "product_lga_suspensions"
+        unique_together = (("product", "lga"),)
+
+
+class IngredientStateSuspension(TimestampedModel):
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id", related_name="state_suspensions")
+    state = models.ForeignKey("geo.State", on_delete=models.CASCADE, db_column="state_id")
+
+    class Meta:
+        db_table = "ingredient_state_suspensions"
+        unique_together = (("ingredient", "state"),)
+
+
+class IngredientLgaSuspension(TimestampedModel):
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id", related_name="lga_suspensions")
+    lga = models.ForeignKey("geo.Lga", on_delete=models.CASCADE, db_column="lga_id")
+
+    class Meta:
+        db_table = "ingredient_lga_suspensions"
         unique_together = (("ingredient", "lga"),)

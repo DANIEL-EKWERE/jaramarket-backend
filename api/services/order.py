@@ -150,7 +150,7 @@ class OrderService:
         return subtotal
 
     @transaction.atomic
-    def create_order(self, user, data):
+    def create_order(self, user, data, audio_file=None):
         subtotal = self._calculate_subtotal(data)
         shipping_fee = _d(data.get("shipping_fee", 0))
         vat = _d(data.get("vat", 0))
@@ -169,6 +169,11 @@ class OrderService:
         if not address or address.latitude is None or address.longitude is None:
             raise ValueError("A delivery address with a location is required to place an order.")
 
+        audio_url = None
+        if audio_file:
+            from api.utils import save_uploaded_file
+            audio_url = save_uploaded_file(audio_file, "orders")
+
         order = Order.objects.create(
             order_date=data.get("order_date") or timezone.now(),
             reference=self._reference(), user=user, address=address,
@@ -177,6 +182,7 @@ class OrderService:
             service_charge=service_charge,
             vat=vat, total=total,
             remarks=data.get("remarks"), meal_prep=data.get("meal_prep"),
+            audio=audio_url,
             status="pending")
 
         TransactionLogService.debit(user.id, USER_TYPE, total, order.id, ORDER_TYPE,

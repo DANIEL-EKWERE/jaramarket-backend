@@ -59,6 +59,22 @@ def validate_otp(request):
 
 @api_view(["POST"])
 @permission_classes([AllowAny])
+def check_otp(request):
+    """Non-consuming OTP check -- for the forgot-password flow's 'enter OTP'
+    step, so the user gets immediate feedback on a wrong/expired code
+    without burning the OTP before the actual reset-password step (which
+    validates and consumes it for real, exactly once)."""
+    ser = OtpSerializer(data=request.data)
+    ser.is_valid(raise_exception=True)
+    try:
+        _reg.validate_otp(ser.validated_data["email"], ser.validated_data["otp"], consume=False)
+    except ValueError as e:
+        return error(str(e), status=400)
+    return success("OTP is valid")
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
 def validate_email(request):
     ser = OtpSerializer(data=request.data)
     ser.is_valid(raise_exception=True)

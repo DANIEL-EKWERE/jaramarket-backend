@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from apps.catalogue.serializers import IngredientSerializer, ProductSerializer
+from apps.catalogue.serializers import IngredientSerializer, ProductSerializer, _full_image_url
 from .models import Order, OrderItem
 
 
@@ -47,11 +47,15 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
 class OrderSerializer(serializers.ModelSerializer):
     items = OrderItemSerializer(many=True, read_only=True)
+    audio = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
         fields = [
             "id", "reference", "order_date", "delivery_type", "shipping_fee",
-            "service_charge", "vat", "total", "remarks", "meal_prep",
+            "service_charge", "vat", "total", "remarks", "meal_prep", "audio",
             "status", "address_id", "created_at", "items",
         ]
+
+    def get_audio(self, obj):
+        return _full_image_url(obj.audio)

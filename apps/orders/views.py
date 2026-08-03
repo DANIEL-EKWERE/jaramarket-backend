@@ -1,3 +1,5 @@
+import json
+
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import permissions
@@ -7,6 +9,23 @@ from api.services import OrderService
 from apps.support.models import Setting
 from .models import OrderItem
 from .serializers import IngredientOrderSerializer, OrderSerializer, VendorOrderItemSerializer
+
+
+def _normalize_multipart_lists(data):
+    """A regular JSON order-creation POST already has real lists for
+    `products`/`ingredients`. But a multipart POST (used when a voice note
+    file is attached) can only carry plain string fields, so the client
+    JSON-encodes those two fields as strings in that case -- decode them
+    back here so the rest of create_order sees the same shape either way."""
+    normalized = data.copy() if hasattr(data, "copy") else dict(data)
+    for key in ("products", "ingredients"):
+        value = normalized.get(key)
+        if isinstance(value, str):
+            try:
+                normalized[key] = json.loads(value)
+            except ValueError:
+                pass
+    return normalized
 
 
 def _paginate(request, qs, serializer_cls):
@@ -46,7 +65,8 @@ def orders_collection(request):
         return success("Orders retrieved successfully",
                        _paginate(request, _svc.all(request.user), OrderSerializer))
     try:
-        order = _svc.create_order(request.user, request.data)
+        data = _normalize_multipart_lists(request.data)
+        order = _svc.create_order(request.user, data, audio_file=request.FILES.get("audio"))
     except ValueError as e:
         return error(str(e), status=422)
     return success("Order created successfully", OrderSerializer(order).data, status=201)

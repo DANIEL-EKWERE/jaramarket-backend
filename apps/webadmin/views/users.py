@@ -21,7 +21,7 @@ def users_list_view(request):
     # Exclude synthetic placeholder rows (e.g. id=-1 "deleted-user@placeholder.invalid",
     # kept only to satisfy FK integrity on old orders/wallets after a real user was
     # deleted) -- there's nothing meaningful to edit/toggle/delete on those.
-    qs = User.objects.filter(id__gt=0).order_by("-created_at")
+    qs = User.objects.filter(id__gt=0, deleted_at__isnull=True).order_by("-created_at")
     if request.GET.get("role"):
         qs = qs.filter(role=request.GET["role"])
     if request.GET.get("search"):
@@ -84,6 +84,7 @@ def user_toggle_status_view(request, user_id):
 def user_delete_view(request, user_id):
     user = get_object_or_404(User, id=user_id)
     user.deleted_at = timezone.now()
-    user.save(update_fields=["deleted_at"])
+    user.is_active = False
+    user.save(update_fields=["deleted_at", "is_active"])
     messages.success(request, f"{user.name} deleted.")
     return redirect("webadmin:users_list")

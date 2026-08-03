@@ -36,7 +36,7 @@
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Unit</th><th>Stock</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>Image</th><th>Name</th><th>Category</th><th>Price</th><th>Unit</th><th>Stock</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for i in page %}
                     <tr>
@@ -54,9 +54,13 @@
                         <td class="font-mono">₦{{ i.price }}{% if i.discounted_price %} <span class="text-slate-400 line-through text-xs">₦{{ i.discounted_price }}</span>{% endif %}</td>
                         <td class="text-slate-500">{{ i.unit }}</td>
                         <td class="text-slate-500">{{ i.stock }}</td>
+                        <td><span class="badge-{% if i.is_active %}success{% else %}danger{% endif %}">{% if i.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{% url 'webadmin:ingredient_update' i.id %}" class="btn-edit">Edit</a>
+                                <form method="post" action="{% url 'webadmin:ingredient_toggle_status' i.id %}" class="inline">
+                                    {% csrf_token %}<button class="btn-edit">{% if i.is_active %}Deactivate{% else %}Activate{% endif %}</button>
+                                </form>
                                 <form method="post" action="{% url 'webadmin:ingredient_delete' i.id %}" class="inline" data-confirm="Delete this ingredient?">
                                     {% csrf_token %}<button class="btn-danger-soft">Delete</button>
                                 </form>
@@ -64,7 +68,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="7" class="text-center text-slate-400 py-12">No ingredients found.</td></tr>
+                    <tr><td colspan="8" class="text-center text-slate-400 py-12">No ingredients found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

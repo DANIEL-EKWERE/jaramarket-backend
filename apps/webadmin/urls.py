@@ -72,6 +72,7 @@ urlpatterns = [
     path("ingredients", catalogue.ingredients_list_view, name="ingredients_list"),
     path("ingredients/create", catalogue.ingredient_create_view, name="ingredient_create"),
     path("ingredients/<int:id>", catalogue.ingredient_update_view, name="ingredient_update"),
+    path("ingredients/<int:id>/toggle-status", catalogue.ingredient_toggle_status_view, name="ingredient_toggle_status"),
     path("ingredients/<int:id>/delete", catalogue.ingredient_delete_view, name="ingredient_delete"),
 
     # Catalogue: advertisements

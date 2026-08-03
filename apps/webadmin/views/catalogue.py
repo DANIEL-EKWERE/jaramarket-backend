@@ -9,7 +9,8 @@ from django.views.decorators.http import require_POST
 
 from apps.catalogue.models import (
     Category, CategoryProduct, CategoryType, Ingredient, IngredientLgaPrice,
-    IngredientStatePrice, Product, ProductStatePrice,
+    IngredientLgaSuspension, IngredientStatePrice, IngredientStateSuspension,
+    Product, ProductLgaSuspension, ProductStatePrice, ProductStateSuspension,
 )
 from apps.geo.models import Lga, State
 from apps.support.models import Advertisement
@@ -41,49 +42,21 @@ def _sync_price_overrides(manager, fk_field, discount_field, rows):
         manager.update_or_create(**{f"{fk_field}_id": fk_id}, defaults=data)
 
 
+def _sync_suspensions(manager, fk_field, ids):
+    """Replace a product/ingredient's suspended-location set (states or
+    LGAs) with the incoming id list -- row existence means "suspended
+    here", so this is just a plain set-sync, no per-row data like prices."""
+    incoming = {int(i) for i in ids if i}
+    manager.exclude(**{f"{fk_field}_id__in": incoming}).delete()
+    for fk_id in incoming:
+        manager.get_or_create(**{f"{fk_field}_id": fk_id})
+
+
 def _save_uploaded_image(uploaded_file, subfolder):
-    """Upload an image to S3 and return the relative key (e.g.
-    "products/<uuid>.jpg") -- the same relative-path convention every
-    pre-existing product/ingredient image already uses, so
-    ProductSerializer._full_image_url() prepends the S3 bucket URL correctly
-    on read (mirrors how those pre-existing images actually got there).
-
-    Falls back to local disk only when AWS credentials aren't configured
-    (i.e. local dev) -- writing to local disk in production doesn't survive
-    Render's ephemeral filesystem across deploys/instances, which is exactly
-    what caused newly-uploaded images to 404 after the first request.
-    """
-    import os
-    import uuid
-    from django.conf import settings
-
-    ext = os.path.splitext(uploaded_file.name)[1]
-    key = f"{subfolder}/{uuid.uuid4().hex}{ext}"
-
-    if settings.AWS_STORAGE_BUCKET_NAME and settings.AWS_ACCESS_KEY_ID:
-        import boto3
-        s3 = boto3.client(
-            "s3",
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
-            region_name=settings.AWS_DEFAULT_REGION,
-        )
-        uploaded_file.seek(0)
-        s3.upload_fileobj(
-            uploaded_file, settings.AWS_STORAGE_BUCKET_NAME, key,
-            ExtraArgs={"ContentType": uploaded_file.content_type or "application/octet-stream"},
-        )
-        return key
-
-    # Local dev fallback (no AWS_* configured): write to MEDIA_ROOT and
-    # return an absolute URL so _full_image_url() doesn't re-prefix it.
-    upload_dir = os.path.join(settings.MEDIA_ROOT, subfolder)
-    os.makedirs(upload_dir, exist_ok=True)
-    filename = os.path.basename(key)
-    with open(os.path.join(upload_dir, filename), "wb") as f:
-        for chunk in uploaded_file.chunks():
-            f.write(chunk)
-    return f"{settings.APP_URL}{settings.MEDIA_URL}{subfolder}/{filename}"
+    """Thin alias -- the actual upload logic is shared with the customer
+    API (e.g. order voice notes) in api.utils.save_uploaded_file."""
+    from api.utils import save_uploaded_file
+    return save_uploaded_file(uploaded_file, subfolder)
 
 # Mirrors App\Enums\CategoryTypeEnum in the PHP admin (FOOD=1, VENDOR=2), seeded
 # identically everywhere by CategoryTypeSeeder / apps/catalogue migrations.
@@ -186,11 +159,15 @@ def product_create_view(request):
                 CategoryProduct.objects.get_or_create(product=p, category_id=cid)
             _sync_price_overrides(p.state_prices, "state", "discount_price",
                                   _extract_price_rows(request, "state_price"))
+            _sync_suspensions(p.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
+            _sync_suspensions(p.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
             messages.success(request, "Product created successfully.")
             return redirect("webadmin:products_list")
     return render(request, "webadmin/catalogue/products/form.html", {
         "product": None, "categories": Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID),
-        "selected_category_ids": [], "states": State.objects.order_by("name"), "state_prices": []})
+        "selected_category_ids": [], "states": State.objects.order_by("name"),
+        "lgas": Lga.objects.select_related("state").order_by("state__name", "name"), "state_prices": [],
+        "suspended_state_ids": [], "suspended_lga_ids": []})
 
 
 @perm_required("manage_products")
@@ -213,12 +190,18 @@ def product_update_view(request, id):
             CategoryProduct.objects.get_or_create(product=p, category_id=cid)
         _sync_price_overrides(p.state_prices, "state", "discount_price",
                               _extract_price_rows(request, "state_price"))
+        _sync_suspensions(p.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
+        _sync_suspensions(p.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
         messages.success(request, "Product updated successfully.")
         return redirect("webadmin:products_list")
     return render(request, "webadmin/catalogue/products/form.html", {
         "product": p, "categories": Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID),
         "selected_category_ids": list(p.categories.values_list("id", flat=True)),
-        "states": State.objects.order_by("name"), "state_prices": p.state_prices.select_related("state").all()})
+        "states": State.objects.order_by("name"),
+        "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
+        "state_prices": p.state_prices.select_related("state").all(),
+        "suspended_state_ids": list(p.state_suspensions.values_list("state_id", flat=True)),
+        "suspended_lga_ids": list(p.lga_suspensions.values_list("lga_id", flat=True))})
 
 
 @require_POST
@@ -279,12 +262,14 @@ def ingredient_create_view(request):
                                   _extract_price_rows(request, "state_price"))
             _sync_price_overrides(ing.lga_prices, "lga", "discounted_price",
                                   _extract_price_rows(request, "lga_price"))
+            _sync_suspensions(ing.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
+            _sync_suspensions(ing.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
             messages.success(request, "Ingredient created successfully.")
             return redirect("webadmin:ingredients_list")
     return render(request, "webadmin/catalogue/ingredients/form.html", {
         "ingredient": None, "categories": Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID),
-        "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("name"),
-        "state_prices": [], "lga_prices": []})
+        "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
+        "state_prices": [], "lga_prices": [], "suspended_state_ids": [], "suspended_lga_ids": []})
 
 
 @perm_required("manage_ingredients")
@@ -305,13 +290,27 @@ def ingredient_update_view(request, id):
                               _extract_price_rows(request, "state_price"))
         _sync_price_overrides(ing.lga_prices, "lga", "discounted_price",
                               _extract_price_rows(request, "lga_price"))
+        _sync_suspensions(ing.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
+        _sync_suspensions(ing.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
         messages.success(request, "Ingredient updated successfully.")
         return redirect("webadmin:ingredients_list")
     return render(request, "webadmin/catalogue/ingredients/form.html", {
         "ingredient": ing, "categories": Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID),
-        "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("name"),
+        "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
         "state_prices": ing.state_prices.select_related("state").all(),
-        "lga_prices": ing.lga_prices.select_related("lga", "lga__state").all()})
+        "lga_prices": ing.lga_prices.select_related("lga", "lga__state").all(),
+        "suspended_state_ids": list(ing.state_suspensions.values_list("state_id", flat=True)),
+        "suspended_lga_ids": list(ing.lga_suspensions.values_list("lga_id", flat=True))})
+
+
+@require_POST
+@perm_required("manage_ingredients")
+def ingredient_toggle_status_view(request, id):
+    ing = get_object_or_404(Ingredient, id=id)
+    ing.is_active = not ing.is_active
+    ing.save(update_fields=["is_active"])
+    messages.success(request, f"{ing.name} is now {'active' if ing.is_active else 'inactive'}.")
+    return redirect("webadmin:ingredients_list")
 
 
 @require_POST
@@ -360,10 +359,14 @@ def advertisements_list_view(request):
 def advertisement_create_view(request):
     if request.method == "POST":
         ingredient_ids = [int(x) for x in request.POST.getlist("ingredient_ids") if x.isdigit()]
+        image_url = ""
+        uploaded_image = request.FILES.get("image_file")
+        if uploaded_image:
+            image_url = _save_uploaded_image(uploaded_image, "advertisements")
         ad = Advertisement.objects.create(
             type=request.POST.get("type", "info"), value=request.POST.get("value") or None,
             ingredient_ids=ingredient_ids, status=request.POST.get("status", "active"),
-            image=request.POST.get("image", ""))
+            image=image_url)
         _apply_ingredient_discounts(ad)
         messages.success(request, "Advertisement created successfully.")
         return redirect("webadmin:advertisements_list")
@@ -375,9 +378,12 @@ def advertisement_create_view(request):
 def advertisement_update_view(request, id):
     ad = get_object_or_404(Advertisement, id=id)
     if request.method == "POST":
-        for field in ["type", "value", "status", "image"]:
+        for field in ["type", "value", "status"]:
             if request.POST.get(field) is not None:
                 setattr(ad, field, request.POST[field])
+        uploaded_image = request.FILES.get("image_file")
+        if uploaded_image:
+            ad.image = _save_uploaded_image(uploaded_image, "advertisements")
         ad.ingredient_ids = [int(x) for x in request.POST.getlist("ingredient_ids") if x.isdigit()]
         ad.save()
         _apply_ingredient_discounts(ad)

@@ -53,7 +53,7 @@ class UserRegistrationService:
             Termii().send(user.phone_number, f"Your Jaramarket OTP is {otp}. It expires in 15 minutes.")
         return otp
 
-    def validate_otp(self, email, otp):
+    def validate_otp(self, email, otp, consume=True):
         cutoff = timezone.now() - timedelta(minutes=OTP_TTL_MINUTES)
         rec = (UserOtp.objects.filter(email=email, otp=otp, created_at__gte=cutoff)
                .order_by("-created_at").first())
@@ -62,7 +62,8 @@ class UserRegistrationService:
         user = User.objects.filter(email=email).first()
         if not user:
             raise ValueError("User not found")
-        rec.delete()
+        if consume:
+            rec.delete()
         return user
 
     def validate_email(self, user):
@@ -101,6 +102,8 @@ class LoginService:
         user = User.objects.filter(email=email.lower()).first()
         if not user or not user.check_password(password):
             raise ValueError("Invalid credentials")
+        if user.deleted_at:
+            raise ValueError("This account has been deleted.")
         if not user.is_active:
             raise ValueError("Account is not active. Please verify your email.")
         user.last_login = timezone.now()

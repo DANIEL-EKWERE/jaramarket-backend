@@ -87,6 +87,35 @@
                 <p id="state-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if state_prices %}hidden{% endif %}">No state overrides -- the default price above applies everywhere.</p>
             </div>
 
+            <div class="border-t border-slate-100 pt-4">
+                <label>Suspend for specific locations</label>
+                <p class="text-xs text-slate-400 mb-2">Product stays active everywhere else -- hidden from customers only in the states/LGAs selected here.</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs">States</label>
+                        <select name="suspended_state_ids" multiple size="6">
+                            {% for s in states %}
+                            <option value="{{ s.id }}" {% if s.id in suspended_state_ids %}selected{% endif %}>{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs">LGAs</label>
+                        <select name="suspended_lga_ids" multiple size="6">
+                            {% regroup lgas by state as lga_state_groups %}
+                            {% for group in lga_state_groups %}
+                            <optgroup label="{{ group.grouper.name|default:'Other' }}">
+                                {% for l in group.list %}
+                                <option value="{{ l.id }}" {% if l.id in suspended_lga_ids %}selected{% endif %}>{{ l.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple.</p>
+            </div>
+
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save</button>
                 <a href="{% url 'webadmin:products_list' %}" class="btn-secondary">Cancel</a>

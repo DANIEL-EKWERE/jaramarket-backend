@@ -101,8 +101,13 @@
                     {% for lp in lga_prices %}
                     <div class="lga-price-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
                         <select name="lga_price_id">
-                            {% for l in lgas %}
-                            <option value="{{ l.id }}" {% if l.id == lp.lga_id %}selected{% endif %}>{{ l.name }} ({{ l.state.name }})</option>
+                            {% regroup lgas by state as lga_state_groups_1 %}
+                            {% for group in lga_state_groups_1 %}
+                            <optgroup label="{{ group.grouper.name|default:'Other' }}">
+                                {% for l in group.list %}
+                                <option value="{{ l.id }}" {% if l.id == lp.lga_id %}selected{% endif %}>{{ l.name }}</option>
+                                {% endfor %}
+                            </optgroup>
                             {% endfor %}
                         </select>
                         <input type="number" step="0.01" name="lga_price_price" value="{{ lp.price }}" placeholder="Price">
@@ -114,8 +119,13 @@
                 <template id="lga-price-row-tpl">
                     <div class="lga-price-row grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
                         <select name="lga_price_id">
-                            {% for l in lgas %}
-                            <option value="{{ l.id }}">{{ l.name }} ({{ l.state.name }})</option>
+                            {% regroup lgas by state as lga_state_groups_2 %}
+                            {% for group in lga_state_groups_2 %}
+                            <optgroup label="{{ group.grouper.name|default:'Other' }}">
+                                {% for l in group.list %}
+                                <option value="{{ l.id }}">{{ l.name }}</option>
+                                {% endfor %}
+                            </optgroup>
                             {% endfor %}
                         </select>
                         <input type="number" step="0.01" name="lga_price_price" placeholder="Price">
@@ -124,6 +134,35 @@
                     </div>
                 </template>
                 <p id="lga-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if lga_prices %}hidden{% endif %}">No LGA overrides -- state or default price applies.</p>
+            </div>
+
+            <div class="border-t border-slate-100 pt-4">
+                <label>Suspend for specific locations</label>
+                <p class="text-xs text-slate-400 mb-2">Ingredient stays active everywhere else -- hidden from customers only in the states/LGAs selected here.</p>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-xs">States</label>
+                        <select name="suspended_state_ids" multiple size="6">
+                            {% for s in states %}
+                            <option value="{{ s.id }}" {% if s.id in suspended_state_ids %}selected{% endif %}>{{ s.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs">LGAs</label>
+                        <select name="suspended_lga_ids" multiple size="6">
+                            {% regroup lgas by state as lga_state_groups_3 %}
+                            {% for group in lga_state_groups_3 %}
+                            <optgroup label="{{ group.grouper.name|default:'Other' }}">
+                                {% for l in group.list %}
+                                <option value="{{ l.id }}" {% if l.id in suspended_lga_ids %}selected{% endif %}>{{ l.name }}</option>
+                                {% endfor %}
+                            </optgroup>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <p class="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple.</p>
             </div>
 
             <div class="flex gap-2 pt-2">

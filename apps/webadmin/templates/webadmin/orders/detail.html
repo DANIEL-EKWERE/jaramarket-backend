@@ -1,4 +1,5 @@
 {% extends "webadmin/base.html" %}
+{% load webadmin_extras %}
 {% block page_title %}Order #{{ order.reference }}{% endblock %}
 {% block content %}
 <div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
@@ -35,6 +36,12 @@
                 <div class="flex justify-between"><dt class="text-slate-400">Address</dt><dd class="text-slate-800">{{ order.address.contact_address|default:"—" }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Date</dt><dd class="text-slate-800">{{ order.created_at }}</dd></div>
                 {% if order.remarks %}<div class="flex justify-between"><dt class="text-slate-400">Remarks</dt><dd class="text-slate-800">{{ order.remarks }}</dd></div>{% endif %}
+                {% if order.audio %}
+                <div class="flex items-center justify-between">
+                    <dt class="text-slate-400">Voice Note</dt>
+                    <dd><audio controls src="{{ order.audio|full_image_url }}" class="h-8" style="max-width: 220px;"></audio></dd>
+                </div>
+                {% endif %}
             </dl>
         </div>
         <div class="card p-6">

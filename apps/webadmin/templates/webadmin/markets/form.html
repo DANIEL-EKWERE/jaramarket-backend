@@ -22,7 +22,7 @@
             <div><label>Address</label><textarea name="address" rows="2">{{ market.address|default:'' }}</textarea></div>
             <div>
                 <label>State</label>
-                <select name="state_id">
+                <select name="state_id" id="market-state-select">
                     <option value="">Select a state</option>
                     {% for s in states %}
                     <option value="{{ s.id }}" {% if market.state_id == s.id %}selected{% endif %}>{{ s.name }}</option>
@@ -31,12 +31,13 @@
             </div>
             <div>
                 <label>LGA</label>
-                <select name="lga_id">
+                <select name="lga_id" id="market-lga-select">
                     <option value="">Select an LGA</option>
                     {% for l in lgas %}
-                    <option value="{{ l.id }}" {% if market.lga_id == l.id %}selected{% endif %}>{{ l.name }}</option>
+                    <option value="{{ l.id }}" data-state="{{ l.state_id }}" {% if market.lga_id == l.id %}selected{% endif %}>{{ l.name }}</option>
                     {% endfor %}
                 </select>
+                <p class="text-xs text-slate-400 mt-1">Narrows to the selected state's LGAs once a state is picked above.</p>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label>Latitude <span class="text-red-500">*</span></label><input type="number" step="any" name="latitude" value="{{ market.latitude|default:'' }}" required></div>
@@ -51,6 +52,29 @@
                 <a href="{% url 'webadmin:markets_list' %}" class="btn-secondary">Cancel</a>
             </div>
         </form>
+        <script>
+        (function () {
+            var stateSelect = document.getElementById('market-state-select');
+            var lgaSelect = document.getElementById('market-lga-select');
+            var lgaOptions = Array.prototype.slice.call(lgaSelect.querySelectorAll('option[data-state]'));
+
+            function applyFilter(resetIfInvalid) {
+                var stateId = stateSelect.value;
+                var currentLga = lgaSelect.value;
+                var stillValid = false;
+                lgaOptions.forEach(function (opt) {
+                    var matches = !stateId || opt.getAttribute('data-state') === stateId;
+                    opt.hidden = !matches;
+                    opt.disabled = !matches;
+                    if (matches && opt.value === currentLga) stillValid = true;
+                });
+                if (resetIfInvalid && !stillValid) lgaSelect.value = '';
+            }
+
+            stateSelect.addEventListener('change', function () { applyFilter(true); });
+            applyFilter(false); // initial render: hide non-matching options, keep any existing selection intact
+        })();
+        </script>
     </div>
 </div>
 {% endblock %}

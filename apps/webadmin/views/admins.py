@@ -17,7 +17,7 @@ from ..decorators import perm_required
 
 @perm_required("manage_admins")
 def admins_list_view(request):
-    qs = User.objects.filter(role=Roles.ADMIN).order_by("-created_at")
+    qs = User.objects.filter(role=Roles.ADMIN, deleted_at__isnull=True).order_by("-created_at")
     paginator = Paginator(qs, request.GET.get("per_page", 10))
     return render(request, "webadmin/admins/list.html", {"page": paginator.get_page(request.GET.get("page"))})
 

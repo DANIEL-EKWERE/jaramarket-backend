@@ -80,9 +80,13 @@ def categories_all_products(request):
                      if lga_id else IngredientLgaPrice.objects.none())
 
     # Fetch ALL products for this page of categories in one query with all prefetches
+    products_qs = Product.objects.filter(categories__id__in=cat_ids, is_active=True)
+    if state_id:
+        products_qs = products_qs.exclude(state_suspensions__state_id=state_id)
+    if lga_id:
+        products_qs = products_qs.exclude(lga_suspensions__lga_id=lga_id)
     products_qs = (
-        Product.objects
-        .filter(categories__id__in=cat_ids, is_active=True)
+        products_qs
         .prefetch_related(
             Prefetch("state_prices", queryset=prod_state_qs, to_attr="_loc_state_prices"),
             Prefetch(
@@ -185,12 +189,24 @@ def categories_limit_products(request):
     return success("Categories with limited products retrieved", out)
 
 
+def _exclude_suspended(qs, state_id, lga_id, state_field, lga_field):
+    """Drop items suspended in the caller's state/LGA -- the item stays
+    globally is_active=True, just hidden for these specific locations."""
+    if state_id:
+        qs = qs.exclude(**{f"{state_field}__state_id": state_id})
+    if lga_id:
+        qs = qs.exclude(**{f"{lga_field}__lga_id": lga_id})
+    return qs
+
+
 @api_view(["GET"])
 def fetch_ingredients(request):
-    qs = Ingredient.objects.all()
+    qs = Ingredient.objects.filter(is_active=True).order_by("name")
     search = request.query_params.get("search")
     if search:
         qs = qs.filter(name__icontains=search)
+    qs = _exclude_suspended(qs, request.query_params.get("state_id"), request.query_params.get("lga_id"),
+                            "state_suspensions", "lga_suspensions")
     return success("Ingredients retrieved", _paginate(request, qs, IngredientSerializer))
 
 
@@ -200,6 +216,8 @@ def fetch_product(request):
     search = request.query_params.get("search")
     if search:
         qs = qs.filter(name__icontains=search)
+    qs = _exclude_suspended(qs, request.query_params.get("state_id"), request.query_params.get("lga_id"),
+                            "state_suspensions", "lga_suspensions")
     return success("Products retrieved", _paginate(request, qs, ProductSerializer))
 
 
@@ -211,6 +229,8 @@ def fetch_uom(request):
 @api_view(["GET"])
 def get_product_by_id(request, id):
     obj = Product.objects.filter(id=id, is_active=True).first()
+    if obj and obj.is_suspended_in(request.query_params.get("state_id"), request.query_params.get("lga_id")):
+        obj = None
     return success("Product retrieved", ProductSerializer(obj).data) if obj else error("Product not found", status=404)
 
 
