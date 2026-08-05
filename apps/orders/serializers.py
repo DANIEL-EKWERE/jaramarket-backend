@@ -15,13 +15,14 @@ class VendorOrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True, default=None)
     order_reference = serializers.CharField(source="order.reference", read_only=True)
     customer_name = serializers.SerializerMethodField()
+    image_url = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
         fields = [
             "id", "status", "quantity", "price", "unit", "amount", "vendor_amount",
             "commision", "ingredient_id", "ingredient_name", "product_id", "product_name",
-            "order_reference", "customer_name", "vendor_id", "vendor_at", "created_at",
+            "order_reference", "customer_name", "image_url", "vendor_id", "vendor_at", "created_at",
         ]
 
     def get_customer_name(self, obj):
@@ -30,6 +31,10 @@ class VendorOrderItemSerializer(serializers.ModelSerializer):
             return None
         full = f"{user.firstname or ''} {user.lastname or ''}".strip()
         return full or user.name or user.email
+
+    def get_image_url(self, obj):
+        path = obj.ingredient.image_url if obj.ingredient else (obj.product.image_url if obj.product else None)
+        return _full_image_url(path)
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
