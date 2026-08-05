@@ -44,7 +44,7 @@
                 <div><label>Longitude <span class="text-red-500">*</span></label><input type="number" step="any" name="longitude" value="{{ market.longitude|default:'' }}" required></div>
             </div>
             <div class="flex items-center gap-2">
-                <input type="checkbox" name="is_active" id="is_active" {% if market.is_active|default:True %}checked{% endif %}>
+                <input type="checkbox" name="is_active" id="is_active" {% if market %}{% if market.is_active %}checked{% endif %}{% else %}checked{% endif %}>
                 <label for="is_active" class="mb-0">Active</label>
             </div>
             <div class="flex gap-2 pt-2">

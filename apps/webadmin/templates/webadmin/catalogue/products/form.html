@@ -16,7 +16,8 @@
 </div>
 
 <div class="w-full px-6 lg:px-8 py-6">
-    <div class="card p-6 max-w-2xl">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+    <div class="card p-6 lg:col-span-2">
         <form method="post" enctype="multipart/form-data" class="space-y-4">
             {% csrf_token %}
             <div><label>Name <span class="text-red-500">*</span></label><input type="text" name="name" value="{{ product.name|default:'' }}" required></div>
@@ -224,6 +225,35 @@
             sync();
         })();
         </script>
+    </div>
+
+    {% if product %}
+    <div class="card p-6 lg:col-span-1">
+        <label>Ingredients</label>
+        <p class="text-xs text-slate-400 mb-3">Ingredients this food item is made from.</p>
+        {% if ingredient_links %}
+        <ul class="space-y-2">
+            {% for link in ingredient_links %}
+            <li class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
+                {% if link.ingredient.image_url %}
+                <img src="{{ link.ingredient.image_url|full_image_url }}" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" alt="">
+                {% else %}
+                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300 flex-shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                </div>
+                {% endif %}
+                <div class="min-w-0">
+                    <p class="text-sm font-medium text-slate-700 truncate">{{ link.ingredient.name }}</p>
+                    {% if link.quantity %}<p class="text-xs text-slate-400">{{ link.quantity }} {{ link.unit|default:link.ingredient.unit }}</p>{% endif %}
+                </div>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <p class="text-sm text-slate-400">No ingredients linked to this food item yet.</p>
+        {% endif %}
+    </div>
+    {% endif %}
     </div>
 </div>
 {% endblock %}

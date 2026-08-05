@@ -133,7 +133,7 @@ def products_list_view(request):
         qs = qs.prefetch_related("categories").order_by("categories__name", "name")
     else:
         qs = qs.order_by("-created_at")
-    qs = qs.distinct()
+    qs = qs.distinct().prefetch_related("ingredientproduct_set__ingredient")
     paginator = Paginator(qs, request.GET.get("per_page", 20))
     return render(request, "webadmin/catalogue/products/list.html", {
         "page": paginator.get_page(request.GET.get("page")),
@@ -201,7 +201,8 @@ def product_update_view(request, id):
         "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
         "state_prices": p.state_prices.select_related("state").all(),
         "suspended_state_ids": list(p.state_suspensions.values_list("state_id", flat=True)),
-        "suspended_lga_ids": list(p.lga_suspensions.values_list("lga_id", flat=True))})
+        "suspended_lga_ids": list(p.lga_suspensions.values_list("lga_id", flat=True)),
+        "ingredient_links": p.ingredientproduct_set.select_related("ingredient").all()})
 
 
 @require_POST
