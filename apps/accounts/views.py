@@ -262,6 +262,39 @@ def pin_reset(request):
     return success("PIN reset successfully")
 
 
+def _social_signin_response(email, firstname, lastname, role, picture, provider):
+    """Shared upsert + token issue for social providers (Google/Apple):
+    the provider has already verified the email, so the account is created
+    pre-verified, and an existing account with that email just signs in."""
+    from apps.finance.models import Wallet
+
+    user, created = User.objects.get_or_create(
+        email=email,
+        defaults={
+            "firstname": firstname or "",
+            "lastname": lastname or "",
+            "role": role,
+            "is_active": True,
+            "is_verified": True,
+            "email_verified_at": timezone.now(),
+            "profile_picture": picture or "",
+        },
+    )
+
+    if not user.is_active:
+        user.is_active = True
+        user.save(update_fields=["is_active"])
+
+    if created:
+        Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+
+    from api.services._base import issue_tokens
+    tokens = issue_tokens(user)
+    payload = auth_user_payload(user, token=tokens["access_token"], refresh=tokens["refresh_token"])
+    payload["is_new_user"] = created
+    return success(f"{provider} sign-in successful", payload, status=201 if created else 200)
+
+
 @api_view(["POST"])
 @permission_classes([AllowAny])
 def google_signin(request):
@@ -299,29 +332,55 @@ def google_signin(request):
     if not email:
         return error("Google token missing email", status=400)
 
-    user, created = User.objects.get_or_create(
-        email=email,
-        defaults={
-            "firstname": idinfo.get("given_name", ""),
-            "lastname": idinfo.get("family_name", ""),
-            "role": role,
-            "is_active": True,
-            "is_verified": True,
-            "email_verified_at": timezone.now(),
-            "profile_picture": idinfo.get("picture", ""),
-        },
-    )
+    return _social_signin_response(
+        email, idinfo.get("given_name", ""), idinfo.get("family_name", ""),
+        role, idinfo.get("picture", ""), "Google")
 
-    if not user.is_active:
-        user.is_active = True
-        user.save(update_fields=["is_active"])
 
-    if created:
-        Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def apple_signin(request):
+    """Verify an Apple identity token and sign in or create the user (upsert).
 
-    from api.services._base import issue_tokens
-    tokens = issue_tokens(user)
-    payload = auth_user_payload(user, token=tokens["access_token"], refresh=tokens["refresh_token"])
-    payload["is_new_user"] = created
-    code = 201 if created else 200
-    return success("Google sign-in successful", payload, status=code)
+    Apple only includes the user's name in the FIRST authorization on the
+    device, and never inside the identity token itself -- so the apps pass
+    firstname/lastname alongside the token and they're used only when the
+    account is being created.
+    """
+    identity_token = request.data.get("identity_token") or request.data.get("id_token")
+    role = request.data.get("role", Roles.CUSTOMER)
+    if not identity_token:
+        return error("identity_token is required", status=422)
+
+    client_ids = [c.strip() for c in settings.APPLE_CLIENT_IDS.split(",") if c.strip()]
+    if not client_ids:
+        return error("Apple sign-in is not configured on this server.", status=503)
+
+    try:
+        import jwt as pyjwt
+        from jwt import PyJWKClient
+
+        signing_key = PyJWKClient("https://appleid.apple.com/auth/keys").get_signing_key_from_jwt(identity_token)
+        idinfo = None
+        last_exc = None
+        for client_id in client_ids:
+            try:
+                idinfo = pyjwt.decode(
+                    identity_token, signing_key.key, algorithms=["RS256"],
+                    audience=client_id, issuer="https://appleid.apple.com",
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+        if idinfo is None:
+            raise last_exc
+    except Exception as exc:
+        return error(f"Invalid Apple token: {exc}", status=401)
+
+    email = idinfo.get("email")
+    if not email:
+        return error("Apple token missing email", status=400)
+
+    return _social_signin_response(
+        email, request.data.get("firstname", ""), request.data.get("lastname", ""),
+        role, "", "Apple")

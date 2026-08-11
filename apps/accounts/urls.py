@@ -5,6 +5,7 @@ urlpatterns = [
     # Guest auth
     path("register", v.register),
     path("google-signin", v.google_signin),
+    path("apple-signin", v.apple_signin),
     path("validate-otp", v.validate_otp),
     path("check-otp", v.check_otp),
     path("validate-email", v.validate_email),

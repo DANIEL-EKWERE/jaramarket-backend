@@ -136,17 +136,20 @@
                 <p id="lga-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if lga_prices %}hidden{% endif %}">No LGA overrides -- state or default price applies.</p>
             </div>
 
-            {% if ingredient %}
-            {% url 'webadmin:ingredient_suspend' ingredient.id as suspend_url %}
-            {% url 'webadmin:ingredient_reactivate' ingredient.id as reactivate_url %}
-            {% include "webadmin/catalogue/_suspend_locations.html" with suspend_url=suspend_url reactivate_url=reactivate_url %}
-            {% endif %}
-
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save</button>
                 <a href="{% url 'webadmin:ingredients_list' %}" class="btn-secondary">Cancel</a>
             </div>
         </form>
+
+        {% comment %}Suspension controls live OUTSIDE the main form: they contain
+           their own instant-action forms, and nesting forms makes the browser
+           close the outer form early -- breaking the Save button.{% endcomment %}
+        {% if ingredient %}
+        {% url 'webadmin:ingredient_suspend' ingredient.id as suspend_url %}
+        {% url 'webadmin:ingredient_reactivate' ingredient.id as reactivate_url %}
+        {% include "webadmin/catalogue/_suspend_locations.html" with suspend_url=suspend_url reactivate_url=reactivate_url %}
+        {% endif %}
         <script>
         (function () {
             var input = document.getElementById('image-file-input');

@@ -88,12 +88,6 @@
                 <p id="state-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if state_prices %}hidden{% endif %}">No state overrides -- the default price above applies everywhere.</p>
             </div>
 
-            {% if product %}
-            {% url 'webadmin:product_suspend' product.id as suspend_url %}
-            {% url 'webadmin:product_reactivate' product.id as reactivate_url %}
-            {% include "webadmin/catalogue/_suspend_locations.html" with suspend_url=suspend_url reactivate_url=reactivate_url %}
-            {% endif %}
-
             <div class="border-t border-slate-100 pt-4">
                 <div class="flex items-center justify-between mb-3">
                     <div>
@@ -148,6 +142,15 @@
                 <a href="{% url 'webadmin:products_list' %}" class="btn-secondary">Cancel</a>
             </div>
         </form>
+
+        {% comment %}Suspension controls live OUTSIDE the main form: they contain
+           their own instant-action forms, and nesting forms makes the browser
+           close the outer form early -- breaking the Save button.{% endcomment %}
+        {% if product %}
+        {% url 'webadmin:product_suspend' product.id as suspend_url %}
+        {% url 'webadmin:product_reactivate' product.id as reactivate_url %}
+        {% include "webadmin/catalogue/_suspend_locations.html" with suspend_url=suspend_url reactivate_url=reactivate_url %}
+        {% endif %}
         <script>
         (function () {
             var input = document.getElementById('image-file-input');
