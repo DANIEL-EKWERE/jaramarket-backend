@@ -43,15 +43,17 @@ def _sync_price_overrides(manager, fk_field, discount_field, rows):
         manager.update_or_create(**{f"{fk_field}_id": fk_id}, defaults=data)
 
 
-def _sync_suspensions(manager, fk_field, ids):
-    """Replace a product/ingredient's suspended-location set (states,
-    LGAs, or markets) with the incoming id list -- row existence means
-    "suspended here", so this is just a plain set-sync, no per-row data
-    like prices."""
-    incoming = {int(i) for i in ids if i}
-    manager.exclude(**{f"{fk_field}_id__in": incoming}).delete()
-    for fk_id in incoming:
-        manager.get_or_create(**{f"{fk_field}_id": fk_id})
+def _suspension_manager(obj, level):
+    """Map a "state"/"lga"/"market" level from the suspend/reactivate forms
+    to the matching related manager + FK field name on a product or
+    ingredient. Deactivate/Reactivate are instant single-row actions (not
+    bundled into the main Save), so this is a plain lookup rather than the
+    full set-sync _sync_price_overrides-style helpers use."""
+    return {
+        "state": (obj.state_suspensions, "state"),
+        "lga": (obj.lga_suspensions, "lga"),
+        "market": (obj.market_suspensions, "market"),
+    }.get(level, (None, None))
 
 
 def _suspension_rows(state_qs, lga_qs, market_qs):
@@ -217,9 +219,6 @@ def product_create_view(request):
                 CategoryProduct.objects.get_or_create(product=p, category_id=cid)
             _sync_price_overrides(p.state_prices, "state", "discount_price",
                                   _extract_price_rows(request, "state_price"))
-            _sync_suspensions(p.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
-            _sync_suspensions(p.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
-            _sync_suspensions(p.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
             linked_ingredients = _sync_ingredient_links(p, _extract_ingredient_rows(request))
             if linked_ingredients:
                 p.price = _ingredient_rows_total(linked_ingredients)
@@ -230,8 +229,6 @@ def product_create_view(request):
         "product": None, "categories": Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID),
         "selected_category_ids": [], "states": State.objects.order_by("name"),
         "lgas": Lga.objects.select_related("state").order_by("state__name", "name"), "state_prices": [],
-        "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
-        "suspensions": [],
         "ingredients": Ingredient.objects.order_by("name"), "ingredient_links": [],
         "uoms": Uom.objects.order_by("name")})
 
@@ -256,9 +253,6 @@ def product_update_view(request, id):
             CategoryProduct.objects.get_or_create(product=p, category_id=cid)
         _sync_price_overrides(p.state_prices, "state", "discount_price",
                               _extract_price_rows(request, "state_price"))
-        _sync_suspensions(p.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
-        _sync_suspensions(p.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
-        _sync_suspensions(p.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
         linked_ingredients = _sync_ingredient_links(p, _extract_ingredient_rows(request))
         if linked_ingredients:
             p.price = _ingredient_rows_total(linked_ingredients)
@@ -294,6 +288,30 @@ def product_delete_view(request, id):
     get_object_or_404(Product, id=id).delete()
     messages.success(request, "Product deleted.")
     return redirect("webadmin:products_list")
+
+
+@require_POST
+@perm_required("manage_products")
+def product_suspend_view(request, id):
+    p = get_object_or_404(Product, id=id)
+    manager, fk_field = _suspension_manager(p, request.POST.get("level"))
+    location_id = request.POST.get("location_id")
+    if manager is not None and location_id:
+        manager.get_or_create(**{f"{fk_field}_id": location_id})
+        messages.success(request, "Deactivated for that location.")
+    return redirect("webadmin:product_update", id=id)
+
+
+@require_POST
+@perm_required("manage_products")
+def product_reactivate_view(request, id):
+    p = get_object_or_404(Product, id=id)
+    manager, fk_field = _suspension_manager(p, request.POST.get("level"))
+    location_id = request.POST.get("location_id")
+    if manager is not None and location_id:
+        manager.filter(**{f"{fk_field}_id": location_id}).delete()
+        messages.success(request, "Reactivated for that location.")
+    return redirect("webadmin:product_update", id=id)
 
 
 # ── Ingredients ──────────────────────────────────────────────────────────────
@@ -336,16 +354,12 @@ def ingredient_create_view(request):
                                   _extract_price_rows(request, "state_price"))
             _sync_price_overrides(ing.lga_prices, "lga", "discounted_price",
                                   _extract_price_rows(request, "lga_price"))
-            _sync_suspensions(ing.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
-            _sync_suspensions(ing.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
-            _sync_suspensions(ing.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
             messages.success(request, "Ingredient created successfully.")
             return redirect("webadmin:ingredients_list")
     return render(request, "webadmin/catalogue/ingredients/form.html", {
         "ingredient": None, "categories": Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID),
         "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
-        "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
-        "state_prices": [], "lga_prices": [], "suspensions": []})
+        "state_prices": [], "lga_prices": []})
 
 
 @perm_required("manage_ingredients")
@@ -366,9 +380,6 @@ def ingredient_update_view(request, id):
                               _extract_price_rows(request, "state_price"))
         _sync_price_overrides(ing.lga_prices, "lga", "discounted_price",
                               _extract_price_rows(request, "lga_price"))
-        _sync_suspensions(ing.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
-        _sync_suspensions(ing.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
-        _sync_suspensions(ing.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
         messages.success(request, "Ingredient updated successfully.")
         return redirect("webadmin:ingredients_list")
     return render(request, "webadmin/catalogue/ingredients/form.html", {
@@ -396,6 +407,30 @@ def ingredient_delete_view(request, id):
     get_object_or_404(Ingredient, id=id).delete()
     messages.success(request, "Ingredient deleted.")
     return redirect("webadmin:ingredients_list")
+
+
+@require_POST
+@perm_required("manage_ingredients")
+def ingredient_suspend_view(request, id):
+    ing = get_object_or_404(Ingredient, id=id)
+    manager, fk_field = _suspension_manager(ing, request.POST.get("level"))
+    location_id = request.POST.get("location_id")
+    if manager is not None and location_id:
+        manager.get_or_create(**{f"{fk_field}_id": location_id})
+        messages.success(request, "Deactivated for that location.")
+    return redirect("webadmin:ingredient_update", id=id)
+
+
+@require_POST
+@perm_required("manage_ingredients")
+def ingredient_reactivate_view(request, id):
+    ing = get_object_or_404(Ingredient, id=id)
+    manager, fk_field = _suspension_manager(ing, request.POST.get("level"))
+    location_id = request.POST.get("location_id")
+    if manager is not None and location_id:
+        manager.filter(**{f"{fk_field}_id": location_id}).delete()
+        messages.success(request, "Reactivated for that location.")
+    return redirect("webadmin:ingredient_update", id=id)
 
 
 # ── Advertisements ───────────────────────────────────────────────────────────

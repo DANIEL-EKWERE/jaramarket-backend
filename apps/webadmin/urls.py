@@ -67,6 +67,8 @@ urlpatterns = [
     path("products/<int:id>", catalogue.product_update_view, name="product_update"),
     path("products/<int:id>/toggle-status", catalogue.product_toggle_status_view, name="product_toggle_status"),
     path("products/<int:id>/delete", catalogue.product_delete_view, name="product_delete"),
+    path("products/<int:id>/suspend", catalogue.product_suspend_view, name="product_suspend"),
+    path("products/<int:id>/reactivate", catalogue.product_reactivate_view, name="product_reactivate"),
 
     # Catalogue: ingredients
     path("ingredients", catalogue.ingredients_list_view, name="ingredients_list"),
@@ -74,6 +76,8 @@ urlpatterns = [
     path("ingredients/<int:id>", catalogue.ingredient_update_view, name="ingredient_update"),
     path("ingredients/<int:id>/toggle-status", catalogue.ingredient_toggle_status_view, name="ingredient_toggle_status"),
     path("ingredients/<int:id>/delete", catalogue.ingredient_delete_view, name="ingredient_delete"),
+    path("ingredients/<int:id>/suspend", catalogue.ingredient_suspend_view, name="ingredient_suspend"),
+    path("ingredients/<int:id>/reactivate", catalogue.ingredient_reactivate_view, name="ingredient_reactivate"),
 
     # Catalogue: advertisements
     path("advertisements", catalogue.advertisements_list_view, name="advertisements_list"),

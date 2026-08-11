@@ -136,7 +136,11 @@
                 <p id="lga-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if lga_prices %}hidden{% endif %}">No LGA overrides -- state or default price applies.</p>
             </div>
 
-            {% include "webadmin/catalogue/_suspend_locations.html" %}
+            {% if ingredient %}
+            {% url 'webadmin:ingredient_suspend' ingredient.id as suspend_url %}
+            {% url 'webadmin:ingredient_reactivate' ingredient.id as reactivate_url %}
+            {% include "webadmin/catalogue/_suspend_locations.html" with suspend_url=suspend_url reactivate_url=reactivate_url %}
+            {% endif %}
 
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save</button>
