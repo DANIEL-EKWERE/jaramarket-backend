@@ -60,10 +60,12 @@ class Product(TimestampedModel):
                 return {"price": sp.price, "discount_price": sp.discount_price, "price_source": "state"}
         return {"price": self.price, "discount_price": self.discount_price, "price_source": "default"}
 
-    def is_suspended_in(self, state_id=None, lga_id=None):
+    def is_suspended_in(self, state_id=None, lga_id=None, market_id=None):
         if state_id and self.state_suspensions.filter(state_id=state_id).exists():
             return True
         if lga_id and self.lga_suspensions.filter(lga_id=lga_id).exists():
+            return True
+        if market_id and self.market_suspensions.filter(market_id=market_id).exists():
             return True
         return False
 
@@ -129,10 +131,12 @@ class Ingredient(TimestampedModel):
                 return {"price": sp.price, "discounted_price": sp.discounted_price, "price_source": "state"}
         return {"price": self.price, "discounted_price": self.discounted_price, "price_source": "default"}
 
-    def is_suspended_in(self, state_id=None, lga_id=None):
+    def is_suspended_in(self, state_id=None, lga_id=None, market_id=None):
         if state_id and self.state_suspensions.filter(state_id=state_id).exists():
             return True
         if lga_id and self.lga_suspensions.filter(lga_id=lga_id).exists():
+            return True
+        if market_id and self.market_suspensions.filter(market_id=market_id).exists():
             return True
         return False
 
@@ -142,6 +146,7 @@ class IngredientProduct(TimestampedModel):
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id")
     quantity = models.DecimalField(max_digits=8, decimal_places=2, null=True, blank=True)
     unit = models.CharField(max_length=255, null=True, blank=True)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 
     class Meta:
         db_table = "ingredient_product"
@@ -220,3 +225,21 @@ class IngredientLgaSuspension(TimestampedModel):
     class Meta:
         db_table = "ingredient_lga_suspensions"
         unique_together = (("ingredient", "lga"),)
+
+
+class ProductMarketSuspension(TimestampedModel):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="market_suspensions")
+    market = models.ForeignKey("vendors.Market", on_delete=models.CASCADE, db_column="market_id")
+
+    class Meta:
+        db_table = "product_market_suspensions"
+        unique_together = (("product", "market"),)
+
+
+class IngredientMarketSuspension(TimestampedModel):
+    ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id", related_name="market_suspensions")
+    market = models.ForeignKey("vendors.Market", on_delete=models.CASCADE, db_column="market_id")
+
+    class Meta:
+        db_table = "ingredient_market_suspensions"
+        unique_together = (("ingredient", "market"),)

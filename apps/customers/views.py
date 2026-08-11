@@ -38,13 +38,19 @@ def addresses_collection(request):
     return success("Address created", AddressSerializer(addr).data, status=201)
 
 
-def _serialize_cart(cart):
+def _serialize_cart(cart, request):
+    """Prices each line against the caller's state_id (same resolution
+    ProductSerializer/get_price_for_location use elsewhere) instead of the
+    product's base price, so a cart total matches what the customer was
+    actually shown while browsing in their location."""
+    state_id = request.query_params.get("state_id")
     items, total = [], Decimal("0")
     for it in cart.items.select_related("product").all():
-        price = Decimal(str(it.product.price)) * it.quantity
-        total += price
-        items.append({"id": it.id, "product": ProductSerializer(it.product).data,
-                      "quantity": it.quantity, "line_total": price})
+        unit_price = Decimal(str(it.product.get_price_for_location(state_id=state_id)["price"]))
+        line_total = unit_price * it.quantity
+        total += line_total
+        items.append({"id": it.id, "product": ProductSerializer(it.product, context={"request": request}).data,
+                      "quantity": it.quantity, "line_total": line_total})
     return {"id": cart.id, "user_id": cart.user_id, "items": items, "total": total}
 
 
@@ -52,7 +58,7 @@ def _serialize_cart(cart):
 def cart_collection(request):
     if request.method == "GET":
         carts = Cart.objects.filter(user=request.user)
-        return success("success", [_serialize_cart(c) for c in carts])
+        return success("success", [_serialize_cart(c, request) for c in carts])
     product_id = request.data.get("product_id")
     quantity = int(request.data.get("quantity", 1))
     if not product_id or quantity < 1:
@@ -66,7 +72,7 @@ def cart_collection(request):
         item.save(update_fields=["quantity"])
     else:
         CartItem.objects.create(cart=cart, product_id=product_id, quantity=quantity)
-    return success("Product added to cart successfully", _serialize_cart(cart), status=201)
+    return success("Product added to cart successfully", _serialize_cart(cart, request), status=201)
 
 
 @api_view(["GET"])
@@ -74,7 +80,7 @@ def cart_show(request, id):
     cart = Cart.objects.filter(id=id, user=request.user).first()
     if not cart:
         return error("Cart not found", status=404)
-    return success("success", _serialize_cart(cart))
+    return success("success", _serialize_cart(cart, request))
 
 
 @api_view(["PUT", "PATCH"])
@@ -90,7 +96,7 @@ def cart_update_item(request, id):
         return error("quantity must be >= 1", status=422)
     item.quantity = quantity
     item.save(update_fields=["quantity"])
-    return success("Cart item updated successfully", _serialize_cart(cart))
+    return success("Cart item updated successfully", _serialize_cart(cart, request))
 
 
 @api_view(["DELETE"])

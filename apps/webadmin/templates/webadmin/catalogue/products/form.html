@@ -16,16 +16,16 @@
 </div>
 
 <div class="w-full px-6 lg:px-8 py-6">
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-    <div class="card p-6 lg:col-span-2">
-        <form method="post" enctype="multipart/form-data" class="space-y-4">
+    <div class="card p-6">
+        <form method="post" enctype="multipart/form-data" class="space-y-4" id="product-form">
             {% csrf_token %}
             <div><label>Name <span class="text-red-500">*</span></label><input type="text" name="name" value="{{ product.name|default:'' }}" required></div>
             <div><label>Description</label><textarea name="description" rows="3">{{ product.description|default:'' }}</textarea></div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label>Price (₦)</label><input type="number" step="0.01" name="price" value="{{ product.price|default:0 }}"></div>
+                <div><label>Price (₦)</label><input type="number" step="0.01" name="price" id="product-price-input" value="{{ product.price|default:0 }}"></div>
                 <div><label>Discount Price (₦)</label><input type="number" step="0.01" name="discount_price" value="{{ product.discount_price|default:'' }}"></div>
             </div>
+            <p id="price-auto-hint" class="text-xs text-slate-400 -mt-2 hidden">Auto-calculated as the sum of the linked ingredients' prices below.</p>
             <div><label>Stock</label><input type="number" name="stock" value="{{ product.stock|default:0 }}"></div>
             <div><label>Preparation Steps</label><textarea name="preparation_steps" rows="4">{{ product.preparation_steps|default:'' }}</textarea></div>
             <div>
@@ -88,33 +88,55 @@
                 <p id="state-price-empty-hint" class="text-xs text-slate-400 mt-2 {% if state_prices %}hidden{% endif %}">No state overrides -- the default price above applies everywhere.</p>
             </div>
 
+            {% include "webadmin/catalogue/_suspend_locations.html" %}
+
             <div class="border-t border-slate-100 pt-4">
-                <label>Suspend for specific locations</label>
-                <p class="text-xs text-slate-400 mb-2">Product stays active everywhere else -- hidden from customers only in the states/LGAs selected here.</p>
-                <div class="grid grid-cols-2 gap-4">
+                <div class="flex items-center justify-between mb-3">
                     <div>
-                        <label class="text-xs">States</label>
-                        <select name="suspended_state_ids" multiple size="6">
-                            {% for s in states %}
-                            <option value="{{ s.id }}" {% if s.id in suspended_state_ids %}selected{% endif %}>{{ s.name }}</option>
-                            {% endfor %}
-                        </select>
+                        <label>Ingredients</label>
+                        <p class="text-xs text-slate-400">Ingredients this food item is made from</p>
                     </div>
-                    <div>
-                        <label class="text-xs">LGAs</label>
-                        <select name="suspended_lga_ids" multiple size="6">
-                            {% regroup lgas by state as lga_state_groups %}
-                            {% for group in lga_state_groups %}
-                            <optgroup label="{{ group.grouper.name|default:'Other' }}">
-                                {% for l in group.list %}
-                                <option value="{{ l.id }}" {% if l.id in suspended_lga_ids %}selected{% endif %}>{{ l.name }}</option>
-                                {% endfor %}
-                            </optgroup>
-                            {% endfor %}
-                        </select>
-                    </div>
+                    <button type="button" id="btn-add-ingredient" class="btn-secondary text-xs px-3 py-1.5">+ Add Ingredient</button>
                 </div>
-                <p class="text-xs text-slate-400 mt-1">Hold Ctrl/Cmd to select multiple.</p>
+                <div id="ingredient-rows" class="space-y-2">
+                    {% for link in ingredient_links %}
+                    <div class="ingredient-row grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <select name="ingredient_id">
+                            {% for ing in ingredients %}
+                            <option value="{{ ing.id }}" data-price="{{ ing.price|default:0 }}" {% if ing.id == link.ingredient_id %}selected{% endif %}>{{ ing.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="ingredient_quantity" value="{{ link.quantity|default:'' }}" placeholder="Quantity">
+                        <select name="ingredient_unit">
+                            <option value="">Unit</option>
+                            {% for u in uoms %}
+                            <option value="{{ u.code }}" {% if u.code == link.unit %}selected{% endif %}>{{ u.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" value="{{ link.price|default_if_none:link.ingredient.price }}" placeholder="Price (₦)">
+                        <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    </div>
+                    {% endfor %}
+                </div>
+                <template id="ingredient-row-tpl">
+                    <div class="ingredient-row grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <select name="ingredient_id">
+                            {% for ing in ingredients %}
+                            <option value="{{ ing.id }}" data-price="{{ ing.price|default:0 }}">{{ ing.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="ingredient_quantity" placeholder="Quantity">
+                        <select name="ingredient_unit">
+                            <option value="">Unit</option>
+                            {% for u in uoms %}
+                            <option value="{{ u.code }}">{{ u.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" placeholder="Price (₦)">
+                        <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    </div>
+                </template>
+                <p id="ingredient-empty-hint" class="text-xs text-slate-400 mt-2 {% if ingredient_links %}hidden{% endif %}">No ingredients linked to this food item yet.</p>
             </div>
 
             <div class="flex gap-2 pt-2">
@@ -224,36 +246,105 @@
             });
             sync();
         })();
-        </script>
-    </div>
 
-    {% if product %}
-    <div class="card p-6 lg:col-span-1">
-        <label>Ingredients</label>
-        <p class="text-xs text-slate-400 mb-3">Ingredients this food item is made from.</p>
-        {% if ingredient_links %}
-        <ul class="space-y-2">
-            {% for link in ingredient_links %}
-            <li class="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-2">
-                {% if link.ingredient.image_url %}
-                <img src="{{ link.ingredient.image_url|full_image_url }}" class="w-9 h-9 rounded-lg object-cover flex-shrink-0" alt="">
-                {% else %}
-                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-300 flex-shrink-0">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14M14 8h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                </div>
-                {% endif %}
-                <div class="min-w-0">
-                    <p class="text-sm font-medium text-slate-700 truncate">{{ link.ingredient.name }}</p>
-                    {% if link.quantity %}<p class="text-xs text-slate-400">{{ link.quantity }} {{ link.unit|default:link.ingredient.unit }}</p>{% endif %}
-                </div>
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-sm text-slate-400">No ingredients linked to this food item yet.</p>
-        {% endif %}
-    </div>
-    {% endif %}
+        (function () {
+            var container = document.getElementById('ingredient-rows');
+            var tpl = document.getElementById('ingredient-row-tpl');
+            var emptyHint = document.getElementById('ingredient-empty-hint');
+            var addBtn = document.getElementById('btn-add-ingredient');
+            var priceInput = document.getElementById('product-price-input');
+            var priceHint = document.getElementById('price-auto-hint');
+            var totalIngredients = tpl.content.querySelector('select').options.length;
+
+            // An ingredient can only be linked once per product, so once it's
+            // picked in one row it must be excluded from every other row's
+            // dropdown, and "+ Add Ingredient" is disabled once every
+            // ingredient is used (mirrors the state-price row behavior above).
+            function sync() {
+                var rows = container.querySelectorAll('.ingredient-row');
+                var chosen = Array.prototype.map.call(rows, function (row) {
+                    return row.querySelector('select[name="ingredient_id"]').value;
+                });
+                rows.forEach(function (row) {
+                    var select = row.querySelector('select[name="ingredient_id"]');
+                    Array.prototype.forEach.call(select.options, function (opt) {
+                        opt.disabled = opt.value !== select.value && chosen.indexOf(opt.value) !== -1;
+                    });
+                });
+                emptyHint.classList.toggle('hidden', rows.length > 0);
+                var maxedOut = totalIngredients > 0 && rows.length >= totalIngredients;
+                addBtn.disabled = maxedOut;
+                addBtn.classList.toggle('opacity-50', maxedOut);
+                addBtn.classList.toggle('cursor-not-allowed', maxedOut);
+            }
+
+            // The food item's price is the accumulated cost of its recipe,
+            // not set independently -- as soon as at least one ingredient is
+            // linked, the Price field mirrors the sum of their row prices
+            // and locks against manual editing.
+            function recalcTotal() {
+                var rows = container.querySelectorAll('.ingredient-row');
+                var total = 0;
+                rows.forEach(function (row) {
+                    var v = parseFloat(row.querySelector('.ingredient-price').value);
+                    if (!isNaN(v)) total += v;
+                });
+                var hasRows = rows.length > 0;
+                priceInput.readOnly = hasRows;
+                priceInput.classList.toggle('bg-slate-100', hasRows);
+                priceInput.classList.toggle('cursor-not-allowed', hasRows);
+                priceHint.classList.toggle('hidden', !hasRows);
+                if (hasRows) priceInput.value = total.toFixed(2);
+            }
+
+            function fillPriceFromIngredient(row) {
+                var select = row.querySelector('select[name="ingredient_id"]');
+                var opt = select.options[select.selectedIndex];
+                var priceField = row.querySelector('.ingredient-price');
+                if (opt && !priceField.value) priceField.value = parseFloat(opt.dataset.price || 0).toFixed(2);
+            }
+
+            addBtn.addEventListener('click', function () {
+                if (addBtn.disabled) return;
+                var usedBefore = Array.prototype.map.call(
+                    container.querySelectorAll('select[name="ingredient_id"]'),
+                    function (s) { return s.value; }
+                );
+                var clone = tpl.content.cloneNode(true);
+                var newSelect = clone.querySelector('select[name="ingredient_id"]');
+                var firstFree = Array.prototype.find.call(newSelect.options, function (opt) {
+                    return usedBefore.indexOf(opt.value) === -1;
+                });
+                if (firstFree) newSelect.value = firstFree.value;
+                container.appendChild(clone);
+                fillPriceFromIngredient(container.lastElementChild);
+                sync();
+                recalcTotal();
+            });
+            container.addEventListener('click', function (e) {
+                if (e.target.classList.contains('remove-ingredient-row')) {
+                    e.target.closest('.ingredient-row').remove();
+                    sync();
+                    recalcTotal();
+                }
+            });
+            container.addEventListener('change', function (e) {
+                if (e.target.tagName !== 'SELECT') return;
+                if (e.target.name === 'ingredient_id') {
+                    var row = e.target.closest('.ingredient-row');
+                    row.querySelector('.ingredient-price').value = '';
+                    fillPriceFromIngredient(row);
+                }
+                sync();
+                recalcTotal();
+            });
+            container.addEventListener('input', function (e) {
+                if (e.target.classList.contains('ingredient-price')) recalcTotal();
+            });
+            sync();
+            recalcTotal();
+        })();
+        </script>
     </div>
 </div>
 {% endblock %}

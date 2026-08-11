@@ -16,7 +16,7 @@ from api.models import (Category, CategoryType, Country, Ingredient, Lga,
 
 UOMS = [("piece", "Piece"), ("kg", "Kilogram"), ("g", "Gram"), ("l", "Liter"),
         ("ml", "Milliliter"), ("cup", "Cup"), ("tbsp", "Tablespoon"),
-        ("tsp", "Teaspoon"), ("por", "Portion")]
+        ("tsp", "Teaspoon"), ("por", "Portion"), ("pack", "Pack")]
 
 CATEGORIES = [(1, "Cabohydrate"), (2, "Protein"), (3, "Vitamin")]  # spelling kept from source
 

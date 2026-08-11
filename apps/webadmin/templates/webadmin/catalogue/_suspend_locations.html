@@ -1,0 +1,174 @@
+{% load webadmin_extras %}
+<div class="border-t border-slate-100 pt-4">
+    <label>Suspend for specific locations</label>
+    <p class="text-xs text-slate-400 mb-3">Stays active everywhere else. Deactivate down to a market for the narrowest restriction, an LGA to cover every market in it, or a state to cover the whole state -- and reactivate any of these below at any time.</p>
+
+    <div class="grid grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end bg-slate-50 border border-slate-200 rounded-lg p-3 mb-3">
+        <div>
+            <label class="text-xs">State</label>
+            <select id="suspend-add-state">
+                <option value="">Select a state</option>
+                {% for s in states %}
+                <option value="{{ s.id }}">{{ s.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="text-xs">LGA <span class="text-slate-400">(optional)</span></label>
+            <select id="suspend-add-lga">
+                <option value="">Entire state</option>
+                {% for l in lgas %}
+                <option value="{{ l.id }}" data-state="{{ l.state_id|default:'' }}">{{ l.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="text-xs">Market <span class="text-slate-400">(optional)</span></label>
+            <select id="suspend-add-market">
+                <option value="">Entire LGA/state</option>
+                {% for m in markets %}
+                <option value="{{ m.id }}" data-state="{{ m.state_id|default:'' }}" data-lga="{{ m.lga_id|default:'' }}">{{ m.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="button" id="btn-add-suspension" class="btn-danger-soft text-xs px-3 py-2">Deactivate</button>
+    </div>
+
+    <div id="suspension-rows" class="space-y-2">
+        {% for row in suspensions %}
+        <div class="suspension-row flex items-center justify-between gap-3 bg-red-50 border border-red-200 rounded-lg p-2 pl-3">
+            <div class="text-sm text-red-800 flex items-center gap-2 min-w-0">
+                <span class="badge-danger flex-shrink-0">{{ row.level|upper }}</span>
+                <span class="truncate">{{ row.label }}</span>
+            </div>
+            <div class="flex-shrink-0">
+                <input type="hidden" name="suspended_{{ row.level }}_ids" value="{{ row.id }}">
+                <button type="button" class="remove-suspension-row btn-secondary text-xs px-2 py-1">Reactivate</button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <p id="suspension-empty-hint" class="text-xs text-slate-400 mt-2 {% if suspensions %}hidden{% endif %}">Active everywhere -- no location restrictions.</p>
+
+    <template id="suspension-row-tpl">
+        <div class="suspension-row flex items-center justify-between gap-3 bg-red-50 border border-red-200 rounded-lg p-2 pl-3">
+            <div class="text-sm text-red-800 flex items-center gap-2 min-w-0">
+                <span class="badge-danger flex-shrink-0 suspension-row-level"></span>
+                <span class="truncate suspension-row-label"></span>
+            </div>
+            <div class="flex-shrink-0">
+                <input type="hidden" class="suspension-row-input">
+                <button type="button" class="remove-suspension-row btn-secondary text-xs px-2 py-1">Reactivate</button>
+            </div>
+        </div>
+    </template>
+</div>
+<script>
+(function () {
+    var stateSelect = document.getElementById('suspend-add-state');
+    var lgaSelect = document.getElementById('suspend-add-lga');
+    var marketSelect = document.getElementById('suspend-add-market');
+    var addBtn = document.getElementById('btn-add-suspension');
+    var rowsContainer = document.getElementById('suspension-rows');
+    var emptyHint = document.getElementById('suspension-empty-hint');
+    var tpl = document.getElementById('suspension-row-tpl');
+
+    var lgaOptions = Array.prototype.slice.call(lgaSelect.querySelectorAll('option[data-state]'));
+    var marketOptions = Array.prototype.slice.call(marketSelect.querySelectorAll('option[data-state], option[data-lga]'));
+
+    // LGA narrows to the chosen state; Market narrows to the chosen LGA if
+    // one is picked, otherwise to the chosen state -- same hide/disable
+    // filtering the standalone Markets admin form already uses, just
+    // chained one level deeper.
+    function filterLgas() {
+        var stateId = stateSelect.value;
+        var current = lgaSelect.value;
+        var stillValid = false;
+        lgaOptions.forEach(function (opt) {
+            var matches = !stateId || opt.getAttribute('data-state') === stateId;
+            opt.hidden = !matches;
+            opt.disabled = !matches;
+            if (matches && opt.value === current) stillValid = true;
+        });
+        if (!stillValid) lgaSelect.value = '';
+    }
+
+    function filterMarkets() {
+        var stateId = stateSelect.value;
+        var lgaId = lgaSelect.value;
+        var current = marketSelect.value;
+        var stillValid = false;
+        marketOptions.forEach(function (opt) {
+            var matches;
+            if (lgaId) matches = opt.getAttribute('data-lga') === lgaId;
+            else if (stateId) matches = opt.getAttribute('data-state') === stateId;
+            else matches = true;
+            opt.hidden = !matches;
+            opt.disabled = !matches;
+            if (matches && opt.value === current) stillValid = true;
+        });
+        if (!stillValid) marketSelect.value = '';
+    }
+
+    stateSelect.addEventListener('change', function () { filterLgas(); filterMarkets(); });
+    lgaSelect.addEventListener('change', filterMarkets);
+    filterLgas();
+    filterMarkets();
+
+    function existingKeys() {
+        return Array.prototype.map.call(rowsContainer.querySelectorAll('.suspension-row-input'), function (input) {
+            return input.name + ':' + input.value;
+        });
+    }
+
+    addBtn.addEventListener('click', function () {
+        var marketId = marketSelect.value;
+        var lgaId = lgaSelect.value;
+        var stateId = stateSelect.value;
+
+        var level, id, label;
+        if (marketId) {
+            var mOpt = marketSelect.options[marketSelect.selectedIndex];
+            var mState = mOpt.getAttribute('data-state');
+            var mLga = mOpt.getAttribute('data-lga');
+            var parts = [];
+            if (mState) { var sOpt = stateSelect.querySelector('option[value="' + mState + '"]'); if (sOpt) parts.push(sOpt.textContent); }
+            if (mLga) { var lOpt = lgaSelect.querySelector('option[value="' + mLga + '"]'); if (lOpt) parts.push(lOpt.textContent); }
+            parts.push(mOpt.textContent);
+            level = 'market'; id = marketId; label = parts.join(' → ');
+        } else if (lgaId) {
+            var lOpt2 = lgaSelect.options[lgaSelect.selectedIndex];
+            var lState = lOpt2.getAttribute('data-state');
+            var sOpt2 = lState ? stateSelect.querySelector('option[value="' + lState + '"]') : null;
+            level = 'lga'; id = lgaId;
+            label = sOpt2 ? (sOpt2.textContent + ' → ' + lOpt2.textContent) : lOpt2.textContent;
+        } else if (stateId) {
+            level = 'state'; id = stateId; label = stateSelect.options[stateSelect.selectedIndex].textContent;
+        } else {
+            return; // nothing picked -- nothing to deactivate
+        }
+
+        var name = 'suspended_' + level + '_ids';
+        if (existingKeys().indexOf(name + ':' + id) !== -1) return; // already deactivated there
+
+        var clone = tpl.content.cloneNode(true);
+        clone.querySelector('.suspension-row-level').textContent = level.toUpperCase();
+        clone.querySelector('.suspension-row-label').textContent = label;
+        var input = clone.querySelector('.suspension-row-input');
+        input.name = name;
+        input.value = id;
+        rowsContainer.appendChild(clone);
+        emptyHint.classList.add('hidden');
+
+        stateSelect.value = ''; lgaSelect.value = ''; marketSelect.value = '';
+        filterLgas(); filterMarkets();
+    });
+
+    rowsContainer.addEventListener('click', function (e) {
+        if (e.target.classList.contains('remove-suspension-row')) {
+            e.target.closest('.suspension-row').remove();
+            emptyHint.classList.toggle('hidden', rowsContainer.querySelectorAll('.suspension-row').length > 0);
+        }
+    });
+})();
+</script>

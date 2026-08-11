@@ -10,10 +10,11 @@ from django.views.decorators.http import require_POST
 from apps.catalogue.models import (
     Category, CategoryProduct, CategoryType, Ingredient, IngredientLgaPrice,
     IngredientLgaSuspension, IngredientStatePrice, IngredientStateSuspension,
-    Product, ProductLgaSuspension, ProductStatePrice, ProductStateSuspension,
+    Product, ProductLgaSuspension, ProductStatePrice, ProductStateSuspension, Uom,
 )
 from apps.geo.models import Lga, State
 from apps.support.models import Advertisement
+from apps.vendors.models import Market
 from ..decorators import admin_required, perm_required
 
 
@@ -43,13 +44,70 @@ def _sync_price_overrides(manager, fk_field, discount_field, rows):
 
 
 def _sync_suspensions(manager, fk_field, ids):
-    """Replace a product/ingredient's suspended-location set (states or
-    LGAs) with the incoming id list -- row existence means "suspended
-    here", so this is just a plain set-sync, no per-row data like prices."""
+    """Replace a product/ingredient's suspended-location set (states,
+    LGAs, or markets) with the incoming id list -- row existence means
+    "suspended here", so this is just a plain set-sync, no per-row data
+    like prices."""
     incoming = {int(i) for i in ids if i}
     manager.exclude(**{f"{fk_field}_id__in": incoming}).delete()
     for fk_id in incoming:
         manager.get_or_create(**{f"{fk_field}_id": fk_id})
+
+
+def _suspension_rows(state_qs, lga_qs, market_qs):
+    """Build a single reactivate/deactivate list for display, merging the
+    three separate suspension tables (state, LGA, market) into one set of
+    {level, id, label} rows the "Suspend for specific locations" UI can
+    render generically regardless of which table a row actually lives in."""
+    rows = []
+    for row in state_qs.select_related("state"):
+        rows.append({"level": "state", "id": row.state_id, "label": row.state.name})
+    for row in lga_qs.select_related("lga__state"):
+        state_name = row.lga.state.name if row.lga.state_id else None
+        label = f"{state_name} → {row.lga.name}" if state_name else row.lga.name
+        rows.append({"level": "lga", "id": row.lga_id, "label": label})
+    for row in market_qs.select_related("market__state", "market__lga"):
+        market = row.market
+        parts = [p.name for p in (market.state, market.lga) if p] + [market.name]
+        rows.append({"level": "market", "id": row.market_id, "label": " → ".join(parts)})
+    return rows
+
+
+def _extract_ingredient_rows(request):
+    """Reconstruct dynamic add/remove ingredient rows from parallel
+    getlist()s (one value per row, in DOM order) -- same pattern as
+    _extract_price_rows."""
+    ids = request.POST.getlist("ingredient_id")
+    quantities = request.POST.getlist("ingredient_quantity")
+    units = request.POST.getlist("ingredient_unit")
+    prices = request.POST.getlist("ingredient_price")
+    return list(zip(ids, quantities, units, prices))
+
+
+def _sync_ingredient_links(product, rows):
+    """Replace a product's linked-ingredients set (each link carrying its
+    own quantity/unit/price) with the incoming rows -- mirrors
+    _sync_price_overrides but keyed on ingredient_id. Returns the synced
+    rows so the caller can total up the product's price from them."""
+    incoming = {}
+    for ing_id, quantity, unit, price in rows:
+        if not ing_id:
+            continue
+        incoming[int(ing_id)] = {"quantity": quantity or None, "unit": unit or None, "price": price or None}
+    product.ingredientproduct_set.exclude(ingredient_id__in=incoming.keys()).delete()
+    for ing_id, data in incoming.items():
+        product.ingredientproduct_set.update_or_create(ingredient_id=ing_id, defaults=data)
+    return incoming
+
+
+def _ingredient_rows_total(incoming):
+    """A food item's price is the accumulated cost of its recipe -- sum
+    each linked ingredient's (editable) row price, once any are linked."""
+    total = Decimal("0")
+    for data in incoming.values():
+        if data["price"] is not None:
+            total += Decimal(str(data["price"]))
+    return total
 
 
 def _save_uploaded_image(uploaded_file, subfolder):
@@ -161,13 +219,21 @@ def product_create_view(request):
                                   _extract_price_rows(request, "state_price"))
             _sync_suspensions(p.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
             _sync_suspensions(p.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
+            _sync_suspensions(p.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
+            linked_ingredients = _sync_ingredient_links(p, _extract_ingredient_rows(request))
+            if linked_ingredients:
+                p.price = _ingredient_rows_total(linked_ingredients)
+                p.save(update_fields=["price"])
             messages.success(request, "Product created successfully.")
             return redirect("webadmin:products_list")
     return render(request, "webadmin/catalogue/products/form.html", {
         "product": None, "categories": Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID),
         "selected_category_ids": [], "states": State.objects.order_by("name"),
         "lgas": Lga.objects.select_related("state").order_by("state__name", "name"), "state_prices": [],
-        "suspended_state_ids": [], "suspended_lga_ids": []})
+        "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
+        "suspensions": [],
+        "ingredients": Ingredient.objects.order_by("name"), "ingredient_links": [],
+        "uoms": Uom.objects.order_by("name")})
 
 
 @perm_required("manage_products")
@@ -192,6 +258,11 @@ def product_update_view(request, id):
                               _extract_price_rows(request, "state_price"))
         _sync_suspensions(p.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
         _sync_suspensions(p.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
+        _sync_suspensions(p.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
+        linked_ingredients = _sync_ingredient_links(p, _extract_ingredient_rows(request))
+        if linked_ingredients:
+            p.price = _ingredient_rows_total(linked_ingredients)
+            p.save(update_fields=["price"])
         messages.success(request, "Product updated successfully.")
         return redirect("webadmin:products_list")
     return render(request, "webadmin/catalogue/products/form.html", {
@@ -200,9 +271,11 @@ def product_update_view(request, id):
         "states": State.objects.order_by("name"),
         "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
         "state_prices": p.state_prices.select_related("state").all(),
-        "suspended_state_ids": list(p.state_suspensions.values_list("state_id", flat=True)),
-        "suspended_lga_ids": list(p.lga_suspensions.values_list("lga_id", flat=True)),
-        "ingredient_links": p.ingredientproduct_set.select_related("ingredient").all()})
+        "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
+        "suspensions": _suspension_rows(p.state_suspensions, p.lga_suspensions, p.market_suspensions),
+        "ingredients": Ingredient.objects.order_by("name"),
+        "ingredient_links": p.ingredientproduct_set.select_related("ingredient").all(),
+        "uoms": Uom.objects.order_by("name")})
 
 
 @require_POST
@@ -265,12 +338,14 @@ def ingredient_create_view(request):
                                   _extract_price_rows(request, "lga_price"))
             _sync_suspensions(ing.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
             _sync_suspensions(ing.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
+            _sync_suspensions(ing.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
             messages.success(request, "Ingredient created successfully.")
             return redirect("webadmin:ingredients_list")
     return render(request, "webadmin/catalogue/ingredients/form.html", {
         "ingredient": None, "categories": Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID),
         "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
-        "state_prices": [], "lga_prices": [], "suspended_state_ids": [], "suspended_lga_ids": []})
+        "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
+        "state_prices": [], "lga_prices": [], "suspensions": []})
 
 
 @perm_required("manage_ingredients")
@@ -293,15 +368,16 @@ def ingredient_update_view(request, id):
                               _extract_price_rows(request, "lga_price"))
         _sync_suspensions(ing.state_suspensions, "state", request.POST.getlist("suspended_state_ids"))
         _sync_suspensions(ing.lga_suspensions, "lga", request.POST.getlist("suspended_lga_ids"))
+        _sync_suspensions(ing.market_suspensions, "market", request.POST.getlist("suspended_market_ids"))
         messages.success(request, "Ingredient updated successfully.")
         return redirect("webadmin:ingredients_list")
     return render(request, "webadmin/catalogue/ingredients/form.html", {
         "ingredient": ing, "categories": Category.objects.filter(category_type_id=VENDOR_CATEGORY_TYPE_ID),
         "states": State.objects.order_by("name"), "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
+        "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
         "state_prices": ing.state_prices.select_related("state").all(),
         "lga_prices": ing.lga_prices.select_related("lga", "lga__state").all(),
-        "suspended_state_ids": list(ing.state_suspensions.values_list("state_id", flat=True)),
-        "suspended_lga_ids": list(ing.lga_suspensions.values_list("lga_id", flat=True))})
+        "suspensions": _suspension_rows(ing.state_suspensions, ing.lga_suspensions, ing.market_suspensions)})
 
 
 @require_POST
