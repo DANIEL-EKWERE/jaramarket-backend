@@ -63,9 +63,9 @@
                 <tbody class="divide-y divide-slate-50">
                 {% for item in items %}
                     <tr>
-                        {# A food order creates one item per ingredient, with the dish
-                           kept on `product` for context -- the ingredient is the line
-                           actually sourced and dispatched, so it leads. #}
+                        {% comment %}A food order creates one item per ingredient, with the
+                           dish kept on `product` for context -- the ingredient is the line
+                           actually sourced and dispatched, so it leads.{% endcomment %}
                         <td class="font-medium text-slate-800">
                             {% if item.ingredient %}
                             {{ item.ingredient.name }}
