@@ -14,6 +14,9 @@ class Support(TimestampedModel):
     class Meta:
         db_table = "supports"
 
+    def __str__(self):
+        return f"{self.user} — {self.status}"
+
 
 class HelpTicket(TimestampedModel):
     STATUS_CHOICES = [("open", "open"), ("in_progress", "in_progress"),
@@ -28,6 +31,9 @@ class HelpTicket(TimestampedModel):
     class Meta:
         db_table = "help_tickets"
 
+    def __str__(self):
+        return f"{self.subject} ({self.status})"
+
 
 class Advertisement(TimestampedModel):
     TYPE_CHOICES = [("discount", "discount"), ("off", "off"), ("info", "info")]
@@ -40,6 +46,9 @@ class Advertisement(TimestampedModel):
 
     class Meta:
         db_table = "advertisements"
+
+    def __str__(self):
+        return f"{self.type} {self.value or ''} ({self.status})".replace("  ", " ")
 
 
 class Setting(TimestampedModel):
@@ -65,3 +74,6 @@ class Notification(models.Model):
 
     class Meta:
         db_table = "notifications"
+
+    def __str__(self):
+        return f"{self.type} -> {self.notifiable_type} #{self.notifiable_id}"

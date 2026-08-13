@@ -20,6 +20,11 @@ class Address(TimestampedModel):
     class Meta:
         db_table = "addresses"
 
+    def __str__(self):
+        where = self.contact_address or ", ".join(
+            p.name for p in (self.lga, self.state) if p) or "no address"
+        return f"{self.user} — {where}"
+
 
 class Cart(TimestampedModel):
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE,
@@ -27,6 +32,9 @@ class Cart(TimestampedModel):
 
     class Meta:
         db_table = "carts"
+
+    def __str__(self):
+        return f"Cart of {self.user}"
 
 
 class CartItem(TimestampedModel):
@@ -37,6 +45,9 @@ class CartItem(TimestampedModel):
 
     class Meta:
         db_table = "cart_items"
+
+    def __str__(self):
+        return f"{self.product} x{self.quantity}"
 
 
 class Favorite(TimestampedModel):
@@ -49,3 +60,6 @@ class Favorite(TimestampedModel):
 
     class Meta:
         db_table = "favorites"
+
+    def __str__(self):
+        return f"{self.user} ♥ {self.product or self.ingredient}"

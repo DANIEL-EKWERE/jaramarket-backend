@@ -10,6 +10,9 @@ class Wallet(TimestampedModel):
     class Meta:
         db_table = "wallets"
 
+    def __str__(self):
+        return f"{self.user} — {self.balance}"
+
 
 class TransactionLog(TimestampedModel):
     SMALLEST_CURRENCY_UNIT = 100
@@ -32,6 +35,9 @@ class TransactionLog(TimestampedModel):
 
     class Meta:
         db_table = "transaction_logs"
+
+    def __str__(self):
+        return f"{self.transaction_type} {self.amount} — {self.reference}"
 
     @property
     def amount_major(self):
@@ -58,6 +64,9 @@ class PaymentLog(TimestampedModel):
     class Meta:
         db_table = "payment_logs"
 
+    def __str__(self):
+        return f"{self.txn_ref} — {self.amount} ({self.status})"
+
 
 class PaymentNow(SoftDeleteModel):
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE,
@@ -73,6 +82,9 @@ class PaymentNow(SoftDeleteModel):
 
     class Meta:
         db_table = "payments"
+
+    def __str__(self):
+        return f"{self.amount} via {self.payment_method} ({self.status})"
 
 
 class Bank(SoftDeleteModel):
@@ -98,6 +110,9 @@ class BankAccount(TimestampedModel):
     class Meta:
         db_table = "bank_accounts"
 
+    def __str__(self):
+        return f"{self.account_name} — {self.account_number} ({self.bank_name})"
+
 
 class Transfer(TimestampedModel):
     reference = models.CharField(max_length=255)
@@ -115,6 +130,9 @@ class Transfer(TimestampedModel):
     class Meta:
         db_table = "transfers"
 
+    def __str__(self):
+        return f"{self.reference} — {self.amount} ({self.status})"
+
 
 class Commission(SoftDeleteModel):
     min_amount = models.DecimalField(max_digits=15, decimal_places=2, default=0)
@@ -123,6 +141,10 @@ class Commission(SoftDeleteModel):
 
     class Meta:
         db_table = "commissions"
+
+    def __str__(self):
+        upper = self.max_amount if self.max_amount is not None else "∞"
+        return f"{self.min_amount}–{upper}: {self.percentage}%"
 
 
 class ServiceFeeTier(SoftDeleteModel):
@@ -140,6 +162,11 @@ class ServiceFeeTier(SoftDeleteModel):
 
     class Meta:
         db_table = "service_fee_tiers"
+
+    def __str__(self):
+        upper = self.max_amount if self.max_amount is not None else "∞"
+        suffix = "%" if self.fee_type == self.PERCENTAGE else " flat"
+        return f"{self.min_amount}–{upper}: {self.value}{suffix}"
 
 
 class DeliveryFee(SoftDeleteModel):

@@ -34,6 +34,9 @@ class CategoryUser(TimestampedModel):
     class Meta:
         db_table = "category_user"
 
+    def __str__(self):
+        return f"{self.user} — {self.category}"
+
 
 class Product(TimestampedModel):
     name = models.CharField(max_length=255)
@@ -77,6 +80,9 @@ class CategoryProduct(TimestampedModel):
     class Meta:
         db_table = "category_product"
 
+    def __str__(self):
+        return f"{self.product} — {self.category}"
+
 
 class Step(TimestampedModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="steps")
@@ -84,6 +90,9 @@ class Step(TimestampedModel):
 
     class Meta:
         db_table = "steps"
+
+    def __str__(self):
+        return f"{self.product}: {self.description[:40]}"
 
 
 class Uom(TimestampedModel):
@@ -151,6 +160,10 @@ class IngredientProduct(TimestampedModel):
     class Meta:
         db_table = "ingredient_product"
 
+    def __str__(self):
+        amount = f" x{self.quantity}{self.unit or ''}" if self.quantity else ""
+        return f"{self.product} — {self.ingredient}{amount}"
+
 
 class ProductStatePrice(TimestampedModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="state_prices")
@@ -161,6 +174,9 @@ class ProductStatePrice(TimestampedModel):
     class Meta:
         db_table = "product_state_prices"
         unique_together = (("product", "state"),)
+
+    def __str__(self):
+        return f"{self.product} in {self.state}: {self.price}"
 
 
 class IngredientStatePrice(TimestampedModel):
@@ -173,6 +189,9 @@ class IngredientStatePrice(TimestampedModel):
         db_table = "ingredient_state_prices"
         unique_together = (("ingredient", "state"),)
 
+    def __str__(self):
+        return f"{self.ingredient} in {self.state}: {self.price}"
+
 
 class IngredientLgaPrice(TimestampedModel):
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id", related_name="lga_prices")
@@ -183,6 +202,9 @@ class IngredientLgaPrice(TimestampedModel):
     class Meta:
         db_table = "ingredient_lga_prices"
         unique_together = (("ingredient", "lga"),)
+
+    def __str__(self):
+        return f"{self.ingredient} in {self.lga}: {self.price}"
 
 
 # ── Location-scoped suspension ──────────────────────────────────────────────
@@ -199,6 +221,9 @@ class ProductStateSuspension(TimestampedModel):
         db_table = "product_state_suspensions"
         unique_together = (("product", "state"),)
 
+    def __str__(self):
+        return f"{self.product} suspended in {self.state}"
+
 
 class ProductLgaSuspension(TimestampedModel):
     product = models.ForeignKey(Product, on_delete=models.CASCADE, db_column="product_id", related_name="lga_suspensions")
@@ -207,6 +232,9 @@ class ProductLgaSuspension(TimestampedModel):
     class Meta:
         db_table = "product_lga_suspensions"
         unique_together = (("product", "lga"),)
+
+    def __str__(self):
+        return f"{self.product} suspended in {self.lga}"
 
 
 class IngredientStateSuspension(TimestampedModel):
@@ -217,6 +245,9 @@ class IngredientStateSuspension(TimestampedModel):
         db_table = "ingredient_state_suspensions"
         unique_together = (("ingredient", "state"),)
 
+    def __str__(self):
+        return f"{self.ingredient} suspended in {self.state}"
+
 
 class IngredientLgaSuspension(TimestampedModel):
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id", related_name="lga_suspensions")
@@ -225,6 +256,9 @@ class IngredientLgaSuspension(TimestampedModel):
     class Meta:
         db_table = "ingredient_lga_suspensions"
         unique_together = (("ingredient", "lga"),)
+
+    def __str__(self):
+        return f"{self.ingredient} suspended in {self.lga}"
 
 
 class ProductMarketSuspension(TimestampedModel):
@@ -235,6 +269,9 @@ class ProductMarketSuspension(TimestampedModel):
         db_table = "product_market_suspensions"
         unique_together = (("product", "market"),)
 
+    def __str__(self):
+        return f"{self.product} suspended at {self.market}"
+
 
 class IngredientMarketSuspension(TimestampedModel):
     ingredient = models.ForeignKey(Ingredient, on_delete=models.CASCADE, db_column="ingredient_id", related_name="market_suspensions")
@@ -243,3 +280,6 @@ class IngredientMarketSuspension(TimestampedModel):
     class Meta:
         db_table = "ingredient_market_suspensions"
         unique_together = (("ingredient", "market"),)
+
+    def __str__(self):
+        return f"{self.ingredient} suspended at {self.market}"

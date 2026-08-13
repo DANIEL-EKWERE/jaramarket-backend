@@ -47,6 +47,9 @@ class Vendor(SoftDeleteModel):
     class Meta:
         db_table = "vendors"
 
+    def __str__(self):
+        return f"{self.user} @ {self.market}" if self.market_id else str(self.user)
+
 
 class StateRepresentative(TimestampedModel):
     user = models.ForeignKey("accounts.User", on_delete=models.CASCADE,
@@ -60,3 +63,6 @@ class StateRepresentative(TimestampedModel):
 
     class Meta:
         db_table = "state_representatives"
+
+    def __str__(self):
+        return f"{self.user} — {self.state}"

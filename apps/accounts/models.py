@@ -184,6 +184,9 @@ class UserPermission(TimestampedModel):
         db_table = "user_permissions"
         unique_together = (("user", "permission"),)
 
+    def __str__(self):
+        return f"{self.user} — {self.permission}"
+
 
 class Admin(TimestampedModel):
     name = models.CharField(max_length=255)
@@ -199,6 +202,9 @@ class Admin(TimestampedModel):
     class Meta:
         db_table = "admins"
 
+    def __str__(self):
+        return f"{self.name} ({self.email})"
+
 
 class AdminPermission(TimestampedModel):
     admin = models.ForeignKey(Admin, on_delete=models.CASCADE, db_column="admin_id")
@@ -207,6 +213,9 @@ class AdminPermission(TimestampedModel):
     class Meta:
         db_table = "admin_permissions"
 
+    def __str__(self):
+        return f"{self.admin} — {self.permission}"
+
 
 class UserOtp(TimestampedModel):
     otp = models.CharField(max_length=255)
@@ -214,6 +223,9 @@ class UserOtp(TimestampedModel):
 
     class Meta:
         db_table = "user_otps"
+
+    def __str__(self):
+        return f"OTP for {self.email}"
 
 
 class FCMDevice(User):

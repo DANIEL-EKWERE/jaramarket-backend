@@ -23,6 +23,9 @@ class Order(SoftDeleteModel):
     class Meta:
         db_table = "orders"
 
+    def __str__(self):
+        return f"{self.reference} — {self.user} ({self.status})"
+
 
 class OrderItem(TimestampedModel):
     order = models.ForeignKey(Order, on_delete=models.CASCADE,
@@ -58,6 +61,10 @@ class OrderItem(TimestampedModel):
     class Meta:
         db_table = "order_items"
 
+    def __str__(self):
+        item = self.ingredient or self.product or "item"
+        return f"{item} x{self.quantity} ({self.status})"
+
 
 class OrderItemLog(TimestampedModel):
     STATUS_CHOICES = [("accepted", "accepted"), ("processing", "processing"),
@@ -72,6 +79,9 @@ class OrderItemLog(TimestampedModel):
 
     class Meta:
         db_table = "order_item_logs"
+
+    def __str__(self):
+        return f"{self.order_item} -> {self.status}"
 
 
 class OrderItemMarketAttempt(TimestampedModel):
@@ -96,6 +106,9 @@ class OrderItemMarketAttempt(TimestampedModel):
     class Meta:
         db_table = "order_item_market_attempts"
 
+    def __str__(self):
+        return f"{self.order_item} @ {self.market} ({self.status})"
+
 
 class MarketOfferResponse(TimestampedModel):
     """One row per vendor notified within a market attempt — lets us tell
@@ -110,3 +123,6 @@ class MarketOfferResponse(TimestampedModel):
     class Meta:
         db_table = "market_offer_responses"
         unique_together = (("attempt", "vendor"),)
+
+    def __str__(self):
+        return f"{self.vendor} — {self.decision}"
