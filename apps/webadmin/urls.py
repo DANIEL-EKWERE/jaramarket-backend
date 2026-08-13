@@ -98,6 +98,13 @@ urlpatterns = [
     path("service-fee-tiers/<int:id>", commissions.service_fee_tier_update_view, name="service_fee_tier_update"),
     path("service-fee-tiers/<int:id>/delete", commissions.service_fee_tier_delete_view, name="service_fee_tier_delete"),
 
+    # Delivery fees (location-based)
+    path("delivery-fees", commissions.delivery_fees_list_view, name="delivery_fees_list"),
+    path("delivery-fees/create", commissions.delivery_fee_create_view, name="delivery_fee_create"),
+    path("delivery-fees/default", commissions.delivery_fee_default_view, name="delivery_fee_default"),
+    path("delivery-fees/<int:id>", commissions.delivery_fee_update_view, name="delivery_fee_update"),
+    path("delivery-fees/<int:id>/delete", commissions.delivery_fee_delete_view, name="delivery_fee_delete"),
+
     # Franchises
     path("franchises", franchises.franchises_list_view, name="franchises_list"),
     path("franchises/create", franchises.franchise_create_view, name="franchise_create"),

@@ -10,6 +10,7 @@ urlpatterns = [
     path("wallet/transfer-to-bank", v.wallet_transfer),
     path("wallets/fund", v.fund_wallet),
     path("banks", v.banks_index),
+    path("delivery-fee", v.delivery_fee),
     path("payments/initialize-transaction", v.fund_wallet),
     path("payments", v.payments_all),
     path("payments/<int:id>", v.payment_show),

@@ -65,6 +65,12 @@ class MarketDispatchService:
         return sorted(markets, key=lambda m: haversine_km(latitude, longitude, m.latitude, m.longitude))
 
     def eligible_vendors(self, market, category_id):
+        # An uncategorised ingredient can't be matched to a vendor by
+        # category. Guard explicitly: `categories__id=None` would compile to
+        # `category_id IS NULL` over a LEFT JOIN and wrongly match vendors
+        # who hold no categories at all.
+        if category_id is None:
+            return User.objects.none()
         return User.objects.filter(
             role=Roles.VENDOR, is_active=True,
             vendor_profile__market=market, vendor_profile__is_active=True,

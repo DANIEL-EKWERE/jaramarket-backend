@@ -21,25 +21,47 @@
             </select>
         </div>
         <div class="w-52"><input type="text" name="search" value="{{ request.GET.search }}" placeholder="Search reference"></div>
+        <div class="w-52">
+            <select name="market_id">
+                <option value="">All markets</option>
+                {% for m in markets %}
+                <option value="{{ m.id }}" {% if request.GET.market_id == m.id|stringformat:"s" %}selected{% endif %}>{{ m.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
         <button class="btn-primary">Filter</button>
+        {% if request.GET.status or request.GET.search or request.GET.market_id %}
+        <a href="{% url 'webadmin:orders_list' %}" class="btn-secondary">Clear</a>
+        {% endif %}
     </form>
 
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Reference</th><th>Customer</th><th>Total</th><th>Status</th><th>Date</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>Reference</th><th>Customer</th><th>Market(s)</th><th>Total</th><th>Status</th><th>Date</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for order in page %}
                     <tr>
                         <td class="font-mono text-xs text-slate-500">{{ order.reference }}</td>
                         <td class="font-medium text-slate-800">{{ order.user.name|default:"N/A" }}</td>
+                        <td>
+                            {% for name in order.routed_markets %}
+                            <span class="badge-info">{{ name }}</span>
+                            {% endfor %}
+                            {% if order.unrouted_count %}
+                            <span class="badge-warning" title="Items not yet offered to any market">{{ order.unrouted_count }} awaiting dispatch</span>
+                            {% endif %}
+                            {% if not order.routed_markets and not order.unrouted_count %}
+                            <span class="text-slate-400">—</span>
+                            {% endif %}
+                        </td>
                         <td class="font-mono">₦{{ order.total }}</td>
                         <td><span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' or order.status == 'delivered' %}info{% elif order.status == 'completed' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span></td>
                         <td class="text-slate-400 text-xs">{{ order.created_at }}</td>
                         <td class="text-right"><a href="{% url 'webadmin:order_detail' order.id %}" class="btn-edit">View</a></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="6" class="text-center text-slate-400 py-12">No orders found.</td></tr>
+                    <tr><td colspan="7" class="text-center text-slate-400 py-12">No orders found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

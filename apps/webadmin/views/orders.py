@@ -18,21 +18,40 @@ _svc = OrderService()
 
 @perm_required("view_orders")
 def orders_list_view(request):
-    qs = Order.objects.select_related("user").order_by("-created_at")
+    qs = (Order.objects.select_related("user")
+          .prefetch_related("items__market").order_by("-created_at"))
     if request.GET.get("status"):
         qs = qs.filter(status=request.GET["status"])
     if request.GET.get("search"):
         s = request.GET["search"]
         qs = qs.filter(reference__icontains=s)
+    if request.GET.get("market_id"):
+        qs = qs.filter(items__market_id=request.GET["market_id"]).distinct()
     paginator = Paginator(qs, request.GET.get("per_page", 20))
+    page = paginator.get_page(request.GET.get("page"))
+    # Items are routed to markets individually, so an order can span several
+    # (or none yet, while it's still awaiting dispatch).
+    for order in page:
+        items = list(order.items.all())
+        order.routed_markets = sorted({i.market.name for i in items if i.market_id})
+        order.unrouted_count = sum(1 for i in items if i.ingredient_id and not i.market_id)
+    from apps.vendors.models import Market
     return render(request, "webadmin/orders/list.html", {
-        "page": paginator.get_page(request.GET.get("page"))})
+        "page": page,
+        "markets": Market.objects.filter(is_active=True).order_by("name")})
 
 
 @perm_required("view_orders")
 def order_detail_view(request, order_id):
     order = get_object_or_404(Order.objects.select_related("user", "address"), id=order_id)
-    items = order.items.select_related("product", "ingredient", "vendor").all()
+    items = list(order.items.select_related("product", "ingredient", "vendor", "market").all())
+    # Offer counts make a stuck item legible: routed to a market but with no
+    # pending offers means no eligible vendor there ever got it.
+    from apps.orders.models import MarketOfferResponse
+    for item in items:
+        offers = MarketOfferResponse.objects.filter(attempt__order_item=item)
+        item.total_offers = offers.count()
+        item.pending_offers = offers.filter(decision="pending", attempt__status="offered").count()
     can_manage = request.user.has_perm_slug("manage_orders")
     can_complete = request.user.role in Roles.ADMIN_ROLES or request.user.role == Roles.QA
     return render(request, "webadmin/orders/detail.html", {

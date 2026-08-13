@@ -325,6 +325,11 @@ def ingredients_list_view(request):
     category_id = request.GET.get("category_id")
     if category_id:
         qs = qs.filter(category_id=category_id)
+    # Order dispatch matches items to vendors purely by the ingredient's
+    # category, so an uncategorised ingredient can never reach a vendor --
+    # make those findable (see MarketDispatchService.eligible_vendors).
+    if request.GET.get("uncategorised"):
+        qs = qs.filter(category__isnull=True)
     if category_id or request.GET.get("sort") == "category":
         qs = qs.order_by("category__name", "name")
     else:

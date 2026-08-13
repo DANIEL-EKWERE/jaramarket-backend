@@ -59,19 +59,43 @@
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/60"><h2 class="text-sm font-semibold text-slate-800">Items ({{ items|length }})</h2></div>
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Amount</th><th>Vendor</th><th>Status</th></tr></thead>
+                <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Amount</th><th>Market</th><th>Offered to</th><th>Vendor</th><th>Status</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for item in items %}
                     <tr>
-                        <td class="font-medium text-slate-800">{% if item.product %}{{ item.product.name }}{% elif item.ingredient %}{{ item.ingredient.name }}{% else %}—{% endif %}</td>
+                        {# A food order creates one item per ingredient, with the dish
+                           kept on `product` for context -- the ingredient is the line
+                           actually sourced and dispatched, so it leads. #}
+                        <td class="font-medium text-slate-800">
+                            {% if item.ingredient %}
+                            {{ item.ingredient.name }}
+                            {% if item.product %}<div class="text-xs font-normal text-slate-400">for {{ item.product.name }}</div>{% endif %}
+                            {% elif item.product %}
+                            {{ item.product.name }}
+                            {% else %}—{% endif %}
+                        </td>
                         <td>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
                         <td class="font-mono">₦{{ item.price }}</td>
                         <td class="font-mono">₦{{ item.amount }}</td>
+                        <td>
+                            {% if item.market %}
+                            {{ item.market.name }}
+                            {% elif item.ingredient %}
+                            <span class="badge-warning">Not routed</span>
+                            {% else %}
+                            <span class="text-slate-400" title="Product lines are not dispatched to markets">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-slate-500 text-xs">
+                            {% if item.pending_offers %}{{ item.pending_offers }} awaiting reply
+                            {% elif item.total_offers %}{{ item.total_offers }} offered, none pending
+                            {% else %}<span class="text-slate-400">—</span>{% endif %}
+                        </td>
                         <td class="text-slate-500">{{ item.vendor.name|default:"Unassigned" }}</td>
                         <td><span class="badge-{% if item.status == 'pending' %}warning{% elif item.status == 'processing' or item.status == 'delivered' %}info{% elif item.status == 'completed' %}success{% else %}danger{% endif %}">{{ item.status|title }}</span></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="6" class="text-center text-slate-400 py-12">No items on this order.</td></tr>
+                    <tr><td colspan="8" class="text-center text-slate-400 py-12">No items on this order.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

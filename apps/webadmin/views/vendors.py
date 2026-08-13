@@ -3,7 +3,7 @@ toggle-status/toggle-verification which the PHP VendorManagementController
 has but api/admin_views.py never got ported over."""
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
@@ -16,20 +16,45 @@ from ..decorators import perm_required
 
 @perm_required("view_vendors")
 def vendors_list_view(request):
-    qs = User.objects.vendors().select_related("state")
+    qs = (User.objects.vendors()
+          .select_related("state", "vendor_profile", "vendor_profile__market")
+          .prefetch_related("categories"))
     if request.GET.get("state_id"):
         qs = qs.filter(state_id=request.GET["state_id"])
     if request.GET.get("category_id"):
         qs = qs.filter(categories__id=request.GET["category_id"])
     if request.GET.get("status"):
         qs = qs.filter(is_active=(request.GET["status"] == "active"))
+    # Order dispatch only ever offers an item to a vendor who is stationed at
+    # a market AND holds the item's category, so surface the ones that can
+    # never receive work (see MarketDispatchService.eligible_vendors).
+    if request.GET.get("readiness") == "not_ready":
+        qs = qs.filter(Q(vendor_profile__isnull=True)
+                       | Q(vendor_profile__market__isnull=True)
+                       | Q(vendor_profile__is_active=False)
+                       | Q(categories__isnull=True))
 
-    qs = qs.distinct()
+    qs = qs.distinct().order_by("-created_at", "id")
     paginator = Paginator(qs, request.GET.get("per_page", 20))
     page = paginator.get_page(request.GET.get("page"))
     for v in page:
         wallet = Wallet.objects.filter(user=v).first()
         v.wallet_balance = wallet.balance if wallet else 0
+        profile = getattr(v, "vendor_profile", None)
+        v.market = profile.market if profile else None
+        reasons = []
+        if profile is None:
+            reasons.append("no vendor profile")
+        else:
+            if profile.market_id is None:
+                reasons.append("no market")
+            if not profile.is_active:
+                reasons.append("profile inactive")
+        if not v.categories.all():
+            reasons.append("no categories")
+        if not v.is_active:
+            reasons.append("account inactive")
+        v.dispatch_blockers = reasons
     return render(request, "webadmin/vendors/list.html", {"page": page})
 
 

@@ -177,3 +177,30 @@ def transfers_index(request):
     return success("Transfers fetched successfully", {
         "data": TransferSerializer(qs[:15], many=True).data,
         "total_transfer_amount": f"{total:,.2f}"})
+
+
+@api_view(["GET"])
+def delivery_fee(request):
+    """Delivery fee for a location, so the app can show it before checkout.
+
+    Accepts ?state_id=&lga_id=, or ?address_id= to read them off one of the
+    caller's saved addresses. Falls back to the caller's default address so
+    the cart can show a fee before any address is picked.
+    """
+    from api.services.order import resolve_delivery_fee
+    from apps.customers.models import Address
+
+    state_id = request.query_params.get("state_id")
+    lga_id = request.query_params.get("lga_id")
+
+    if not state_id and not lga_id:
+        addresses = Address.objects.filter(user=request.user)
+        address_id = request.query_params.get("address_id")
+        address = (addresses.filter(id=address_id).first() if address_id
+                   else addresses.order_by("-is_default", "id").first())
+        if address:
+            state_id, lga_id = address.state_id, address.lga_id
+
+    fee = resolve_delivery_fee(state_id, lga_id)
+    return success("Delivery fee retrieved", {
+        "delivery_fee": f"{fee:.2f}", "state_id": state_id, "lga_id": lga_id})

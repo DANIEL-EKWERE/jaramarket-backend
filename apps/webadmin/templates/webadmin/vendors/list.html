@@ -17,26 +17,44 @@
                 <option value="inactive" {% if request.GET.status == "inactive" %}selected{% endif %}>Inactive</option>
             </select>
         </div>
+        <div class="w-56">
+            <select name="readiness">
+                <option value="">All vendors</option>
+                <option value="not_ready" {% if request.GET.readiness == "not_ready" %}selected{% endif %}>Can't receive orders</option>
+            </select>
+        </div>
         <button class="btn-primary">Filter</button>
+        {% if request.GET.readiness or request.GET.status %}
+        <a href="{% url 'webadmin:vendors_list' %}" class="btn-secondary">Clear</a>
+        {% endif %}
     </form>
 
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Name</th><th>Contact</th><th>State</th><th>Categories</th><th>Wallet</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>Name</th><th>Contact</th><th>State</th><th>Market</th><th>Categories</th><th>Can receive orders?</th><th>Wallet</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for v in page %}
                     <tr>
                         <td class="font-medium text-slate-800">{{ v.name }}</td>
                         <td>{{ v.email }}<br><span class="text-slate-400 text-xs">{{ v.phone_number }}</span></td>
                         <td class="text-slate-500">{{ v.state.name|default:"—" }}</td>
-                        <td>{% for c in v.categories.all %}<span class="badge-info">{{ c.name }}</span> {% endfor %}</td>
+                        <td>{% if v.market %}{{ v.market.name }}{% else %}<span class="badge-danger">Not set</span>{% endif %}</td>
+                        <td>{% for c in v.categories.all %}<span class="badge-info">{{ c.name }}</span> {% empty %}<span class="badge-danger">None</span>{% endfor %}</td>
+                        <td>
+                            {% if v.dispatch_blockers %}
+                            <span class="badge-danger">No</span>
+                            <div class="text-xs text-slate-400 mt-1">{{ v.dispatch_blockers|join:", " }}</div>
+                            {% else %}
+                            <span class="badge-success">Yes</span>
+                            {% endif %}
+                        </td>
                         <td class="font-mono">₦{{ v.wallet_balance }}</td>
                         <td><span class="badge-{% if v.is_active %}success{% else %}danger{% endif %}">{% if v.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right"><a href="{% url 'webadmin:vendor_detail' v.id %}" class="btn-edit">View</a></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="7" class="text-center text-slate-400 py-12">No vendors found.</td></tr>
+                    <tr><td colspan="9" class="text-center text-slate-400 py-12">No vendors found.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

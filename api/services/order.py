@@ -11,7 +11,7 @@ from django.utils import timezone
 from apps.accounts.models import Roles
 from apps.catalogue.models import Ingredient, IngredientProduct, Product
 from apps.customers.models import Address
-from apps.finance.models import Commission, ServiceFeeTier, TransactionLog, Wallet
+from apps.finance.models import Commission, DeliveryFee, ServiceFeeTier, TransactionLog, Wallet
 from apps.orders.models import MarketOfferResponse, Order, OrderItem, OrderItemLog
 from apps.support.models import Setting
 from ._base import ORDER_TYPE, USER_TYPE, _d, _setting
@@ -62,6 +62,22 @@ def calculate_service_fee(subtotal):
     if tier.fee_type == ServiceFeeTier.FLAT:
         return _d(tier.value)
     return (subtotal * _d(tier.value) / 100).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+
+def resolve_delivery_fee(state_id=None, lga_id=None):
+    """Return the delivery fee for a customer location, most specific first:
+    an LGA-specific row wins over its state-wide row, and when nothing
+    matches the `delivery_fee_default` setting applies so checkout never
+    breaks on an unconfigured location."""
+    if lga_id:
+        row = DeliveryFee.objects.filter(lga_id=lga_id).first()
+        if row:
+            return _d(row.fee)
+    if state_id:
+        row = DeliveryFee.objects.filter(state_id=state_id, lga__isnull=True).first()
+        if row:
+            return _d(row.fee)
+    return _d(_setting("delivery_fee_default", 2000))
 
 
 def _get_wallet(user_id):
@@ -128,6 +144,26 @@ class OrderService:
     def get_order_by_id(self, user, order_id):
         return Order.objects.filter(user=user, id=order_id).first()
 
+    def _recipe_lines(self, product, ordered_quantity):
+        """Yield (link, unit_price, quantity) for one product line.
+
+        Both the subtotal and the saved OrderItems go through here so they
+        can never drift apart. A recipe row's cost is its per-recipe price
+        override when set (that's what the admin edits, and what the
+        product's own price is the sum of), otherwise the ingredient's
+        price times the recipe quantity -- and the whole recipe scales by
+        how many of the dish were actually ordered.
+        """
+        ordered_quantity = int(ordered_quantity or 1) or 1
+        for link in IngredientProduct.objects.filter(product=product).select_related("ingredient"):
+            recipe_quantity = _d(link.quantity or 1)
+            if link.price is not None and recipe_quantity:
+                unit_price = (_d(link.price) / recipe_quantity).quantize(
+                    Decimal("0.01"), ROUND_HALF_UP)
+            else:
+                unit_price = _d(link.ingredient.price)
+            yield link, unit_price, recipe_quantity * ordered_quantity
+
     def _calculate_subtotal(self, data):
         """Independently resolve the order's subtotal server-side, mirroring
         how _save_food/_save_ingredients price each line item, so the
@@ -144,23 +180,15 @@ class OrderService:
             product = Product.objects.filter(id=pd["product_id"]).first()
             if not product:
                 raise ValueError(f"Product {pd['product_id']} not found")
-            for link in IngredientProduct.objects.filter(product=product):
-                quantity = link.quantity or 1
-                subtotal += _d(link.ingredient.price) * _d(quantity)
+            for _link, unit_price, quantity in self._recipe_lines(product, pd.get("quantity")):
+                subtotal += unit_price * quantity
         return subtotal
 
     @transaction.atomic
     def create_order(self, user, data, audio_file=None):
-        subtotal = self._calculate_subtotal(data)
-        shipping_fee = _d(data.get("shipping_fee", 0))
-        vat = _d(data.get("vat", 0))
-        service_charge = calculate_service_fee(subtotal)
-        total = subtotal + shipping_fee + vat + service_charge
-
-        wallet = _get_wallet(user.id)
-        if _d(wallet.balance) < total:
-            raise ValueError("Insufficient wallet balance.")
-
+        # The delivery address is resolved first because the delivery fee is
+        # derived from it -- the client's shipping_fee is display-only and is
+        # never trusted for what the customer is actually charged.
         address = None
         if data.get("address_id"):
             address = Address.objects.filter(id=data["address_id"], user=user).first()
@@ -168,6 +196,16 @@ class OrderService:
                 raise ValueError("Invalid delivery address")
         if not address or address.latitude is None or address.longitude is None:
             raise ValueError("A delivery address with a location is required to place an order.")
+
+        subtotal = self._calculate_subtotal(data)
+        shipping_fee = resolve_delivery_fee(address.state_id, address.lga_id)
+        vat = _d(data.get("vat", 0))
+        service_charge = calculate_service_fee(subtotal)
+        total = subtotal + shipping_fee + vat + service_charge
+
+        wallet = _get_wallet(user.id)
+        if _d(wallet.balance) < total:
+            raise ValueError("Insufficient wallet balance.")
 
         audio_url = None
         if audio_file:
@@ -244,13 +282,11 @@ class OrderService:
             product = Product.objects.filter(id=pd["product_id"]).first()
             if not product:
                 raise ValueError(f"Product {pd['product_id']} not found")
-            for link in IngredientProduct.objects.filter(product=product):
-                ingredient = link.ingredient
-                quantity = link.quantity or 1
-                b = self._get_bonuses(ingredient.price, quantity, order, user)
+            for link, unit_price, quantity in self._recipe_lines(product, pd.get("quantity")):
+                b = self._get_bonuses(unit_price, quantity, order, user)
                 OrderItem.objects.create(
-                    order=order, product=product, ingredient=ingredient,
-                    quantity=int(quantity), price=ingredient.price, unit=link.unit,
+                    order=order, product=product, ingredient=link.ingredient,
+                    quantity=int(quantity), price=unit_price, unit=link.unit,
                     amount=b["item_total"], commision=b["commission"],
                     vendor_amount=b["item_total"] - b["commission"],
                     referral=b["referral_commission"], referral_user_id=b["referral_id"],

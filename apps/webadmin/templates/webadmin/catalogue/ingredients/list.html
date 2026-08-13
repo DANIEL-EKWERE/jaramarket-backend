@@ -30,7 +30,14 @@
             <input type="checkbox" name="sort" value="category" {% if request.GET.sort == "category" %}checked{% endif %}>
             Group by category
         </label>
+        <label class="flex items-center gap-2 text-sm text-slate-600">
+            <input type="checkbox" name="uncategorised" value="1" {% if request.GET.uncategorised %}checked{% endif %}>
+            Missing category only
+        </label>
         <button class="btn-primary">Filter</button>
+        {% if request.GET.search or request.GET.category_id or request.GET.uncategorised or request.GET.sort %}
+        <a href="{% url 'webadmin:ingredients_list' %}" class="btn-secondary">Clear</a>
+        {% endif %}
     </form>
 
     <div class="card overflow-hidden">
@@ -50,7 +57,7 @@
                             {% endif %}
                         </td>
                         <td class="font-medium text-slate-800">{{ i.name }}</td>
-                        <td class="text-slate-500">{{ i.category.name|default:"—" }}</td>
+                        <td class="text-slate-500">{% if i.category %}{{ i.category.name }}{% else %}<span class="badge-danger" title="Vendors are matched by category — without one this item can never reach a vendor">Not set</span>{% endif %}</td>
                         <td class="font-mono">₦{{ i.price }}{% if i.discounted_price %} <span class="text-slate-400 line-through text-xs">₦{{ i.discounted_price }}</span>{% endif %}</td>
                         <td class="text-slate-500">{{ i.unit }}</td>
                         <td class="text-slate-500">{{ i.stock }}</td>

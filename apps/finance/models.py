@@ -140,3 +140,23 @@ class ServiceFeeTier(SoftDeleteModel):
 
     class Meta:
         db_table = "service_fee_tiers"
+
+
+class DeliveryFee(SoftDeleteModel):
+    """Location-based delivery fee. A row with only a state set applies to
+    that whole state; adding an LGA narrows it to that LGA and takes
+    priority over the state-wide row. When a customer's location matches
+    nothing, DELIVERY_FEE_DEFAULT applies so checkout never breaks."""
+    state = models.ForeignKey("geo.State", on_delete=models.CASCADE, db_column="state_id",
+                              related_name="delivery_fees")
+    lga = models.ForeignKey("geo.Lga", on_delete=models.CASCADE, null=True, blank=True,
+                            db_column="lga_id", related_name="delivery_fees")
+    fee = models.DecimalField(max_digits=10, decimal_places=2)
+
+    class Meta:
+        db_table = "delivery_fees"
+        unique_together = (("state", "lga"),)
+
+    def __str__(self):
+        where = f"{self.state.name} → {self.lga.name}" if self.lga_id else self.state.name
+        return f"{where}: {self.fee}"
