@@ -108,6 +108,57 @@ def order_mark_completed(request, order):
 
 
 @api_view(["GET"])
+def order_item_replacements(request, item_id):
+    """Alternatives the customer can actually be served for an unavailable
+    item -- filtered to categories a vendor near their address covers."""
+    from apps.catalogue.serializers import IngredientSerializer
+    try:
+        item, options = _svc.replacement_options(request.user, item_id)
+    except ValueError as e:
+        return error(str(e), status=422)
+    return success("Replacement options retrieved", {
+        "order_item_id": item.id,
+        "current": {
+            "ingredient_id": item.ingredient_id,
+            "name": item.ingredient.name if item.ingredient_id else None,
+            "quantity": item.quantity,
+            "amount": str(item.amount),
+        },
+        "options": IngredientSerializer(options, many=True,
+                                        context={"request": request}).data,
+    })
+
+
+@api_view(["POST"])
+def order_item_replace(request, item_id):
+    """Swap an unavailable item for one the customer chose. Any price
+    difference is settled against their wallet rather than refunded."""
+    ingredient_id = request.data.get("ingredient_id")
+    if not ingredient_id:
+        return error("ingredient_id is required", status=422)
+    try:
+        item, difference = _svc.replace_item(
+            request.user, item_id, ingredient_id, request.data.get("quantity"))
+    except ValueError as e:
+        return error(str(e), status=422)
+    return success("Item replaced successfully", {
+        "order": OrderSerializer(item.order).data,
+        "price_difference": str(difference),
+    })
+
+
+@api_view(["POST"])
+def order_mark_received(request, order):
+    """Customer confirms the order actually reached them — the final step
+    after admin approval has paid vendors and released it to logistics."""
+    try:
+        obj = _svc.mark_received(request.user, order)
+    except ValueError as e:
+        return error(str(e), status=422)
+    return success("Order marked as received", OrderSerializer(obj).data)
+
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated, IsVendor])
 def vendor_available_orders(request):
     return success("Available orders retrieved successfully",

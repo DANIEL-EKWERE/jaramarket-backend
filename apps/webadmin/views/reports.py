@@ -62,7 +62,7 @@ def products_report_view(request):
     return render(request, "webadmin/reports/products.html", {"rows": rows})
 
 
-@perm_required("view_reports", "view_transactions")
+@perm_required("view_transactions")
 def finance_summary_report_view(request):
     start, end = _range(request)
     deposits = (PaymentLog.objects.filter(status="success",
@@ -77,7 +77,7 @@ def finance_summary_report_view(request):
         "total_deposits": deposits, "total_transfers": transfers / 100})
 
 
-@perm_required("view_reports", "view_transactions")
+@perm_required("view_transactions")
 def payments_report_view(request):
     start, end = _range(request)
     payments = PaymentLog.objects.filter(created_at__date__gte=start, created_at__date__lte=end)

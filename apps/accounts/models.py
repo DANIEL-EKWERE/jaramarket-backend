@@ -17,7 +17,8 @@ class Roles:
         (QA, "Quality Assurance"), (ACCOUNT, "Account"),
         (STATE_REPRESENTATIVE, "State Representative"),
     ]
-    ADMIN_ROLES = [SUPER_ADMIN, ADMIN, STATE_ADMIN, VENDOR_MANAGER, ACCOUNTS, AUDIT, LOGISTICS]
+    ADMIN_ROLES = [SUPER_ADMIN, ADMIN, STATE_ADMIN, VENDOR_MANAGER, ACCOUNTS, AUDIT, LOGISTICS,
+                   STATE_REPRESENTATIVE]
 
     ALL_PERMISSION_SLUGS = [
         "view_dashboard", "view_orders", "manage_orders", "view_users", "manage_users",
@@ -41,6 +42,13 @@ class Roles:
         ACCOUNTS: ["view_dashboard", "view_transactions", "view_wallets", "manage_withdrawals", "view_reports"],
         AUDIT: ["view_transactions", "view_wallets", "view_reports", "view_orders"],
         LOGISTICS: ["view_orders", "manage_orders", "view_logistics"],
+        # A state rep is a State Admin for their own state -- same abilities,
+        # but every dashboard list is filtered to the state(s) they cover
+        # (see User.scoped_state_ids / webadmin.scoping).
+        STATE_REPRESENTATIVE: ["view_dashboard", "view_orders", "manage_orders", "view_users",
+                               "manage_users", "view_vendors", "manage_vendors",
+                               "view_reports", "view_logistics",
+                               "view_categories", "view_products", "view_ingredients"],
     }
 
     @classmethod
@@ -159,6 +167,25 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_logistics(self):      return self.role == Roles.LOGISTICS
     def is_vendor(self):         return self.role == Roles.VENDOR
     def is_customer(self):       return self.role == Roles.CUSTOMER
+
+    def is_state_representative(self): return self.role == Roles.STATE_REPRESENTATIVE
+
+    @property
+    def scoped_state_ids(self):
+        """State ids this user's dashboard view is limited to.
+
+        Empty list means unrestricted (every other admin role). State reps
+        only ever see data for the state(s) they represent.
+        """
+        if self.role != Roles.STATE_REPRESENTATIVE:
+            return []
+        ids = list(self.state_representative.values_list("state_id", flat=True))
+        # A rep with no state row configured must not fall through to
+        # "unrestricted" -- fall back to their own profile state, else -1
+        # (matches nothing) so a misconfiguration can't leak the country.
+        if not ids:
+            ids = [self.state_id] if self.state_id else [-1]
+        return ids
 
     def has_perm_slug(self, slug):
         if self.is_super_admin():

@@ -5,6 +5,7 @@ that was missed in the initial port. Reuses OrderService.cancel_order() /
 mark_completed() for the actions so business rules aren't duplicated."""
 from django.contrib import messages
 from django.core.paginator import Paginator
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -12,6 +13,7 @@ from api.services import OrderService
 from apps.accounts.models import Roles
 from apps.orders.models import Order, OrderItem
 from ..decorators import perm_required
+from ..scoping import ensure_in_scope, scope
 
 _svc = OrderService()
 
@@ -20,6 +22,7 @@ _svc = OrderService()
 def orders_list_view(request):
     qs = (Order.objects.select_related("user")
           .prefetch_related("items__market").order_by("-created_at"))
+    qs = scope(qs, request, "address__state_id")
     if request.GET.get("status"):
         qs = qs.filter(status=request.GET["status"])
     if request.GET.get("search"):
@@ -44,6 +47,7 @@ def orders_list_view(request):
 @perm_required("view_orders")
 def order_detail_view(request, order_id):
     order = get_object_or_404(Order.objects.select_related("user", "address"), id=order_id)
+    ensure_in_scope(request, order.address.state_id if order.address_id else None)
     items = list(order.items.select_related("product", "ingredient", "vendor", "market").all())
     # Offer counts make a stuck item legible: routed to a market but with no
     # pending offers means no eligible vendor there ever got it.
@@ -56,6 +60,76 @@ def order_detail_view(request, order_id):
     can_complete = request.user.role in Roles.ADMIN_ROLES or request.user.role == Roles.QA
     return render(request, "webadmin/orders/detail.html", {
         "order": order, "items": items, "can_manage": can_manage, "can_complete": can_complete})
+
+
+# ── Logistics ────────────────────────────────────────────────────────────────
+# The last leg. Items are consolidated once admin approval pays the vendors
+# out, so one in-house rider carries the whole order; the customer's own
+# "received" confirmation closes it.
+
+@perm_required("view_orders")
+def logistics_queue_view(request):
+    from apps.accounts.models import User
+    from apps.orders.models import Delivery
+
+    qs = (Order.objects.filter(status__in=("completed", "in_transit"))
+          .select_related("user", "address", "delivery", "delivery__rider")
+          .order_by("status", "-created_at"))
+    qs = scope(qs, request, "address__state_id")
+    if request.GET.get("state") == "unassigned":
+        qs = qs.filter(Q(delivery__isnull=True) | Q(delivery__rider__isnull=True))
+    elif request.GET.get("state") == "in_transit":
+        qs = qs.filter(status="in_transit")
+
+    paginator = Paginator(qs, request.GET.get("per_page", 20))
+    page = paginator.get_page(request.GET.get("page"))
+    for order in page:
+        order.delivery_row = getattr(order, "delivery", None)
+    return render(request, "webadmin/orders/logistics.html", {
+        "page": page,
+        "riders": User.objects.filter(role=Roles.LOGISTICS, is_active=True).order_by("firstname"),
+        "awaiting": scope(Order.objects.filter(status="completed"), request, "address__state_id").count(),
+        "in_transit": scope(Order.objects.filter(status="in_transit"), request, "address__state_id").count(),
+    })
+
+
+@require_POST
+@perm_required("manage_orders")
+def order_assign_rider_view(request, order_id):
+    try:
+        delivery = _svc.assign_rider(request.user, order_id,
+                                     request.POST.get("rider_id"),
+                                     note=request.POST.get("note") or None)
+        messages.success(request, f"Assigned to {delivery.rider}.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect(request.POST.get("next") or "webadmin:logistics_queue")
+
+
+@require_POST
+@perm_required("manage_orders")
+def order_dispatch_view(request, order_id):
+    try:
+        _svc.dispatch_delivery(request.user, order_id)
+        messages.success(request, "Order dispatched — customer notified it's on the way.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect(request.POST.get("next") or "webadmin:logistics_queue")
+
+
+@require_POST
+@perm_required("manage_orders")
+def order_mark_received_view(request, order_id):
+    """Admin override for the customer's final confirmation -- otherwise an
+    order that has been approved and shipped stays open indefinitely if the
+    customer never taps 'received' in the app."""
+    order = get_object_or_404(Order, id=order_id)
+    try:
+        _svc.mark_received(request.user, order.id)
+        messages.success(request, f"Order #{order.reference} marked as received.")
+    except ValueError as e:
+        messages.error(request, str(e))
+    return redirect("webadmin:order_detail", order_id=order.id)
 
 
 @require_POST
@@ -92,6 +166,7 @@ def orders_manual_queue_view(request):
           .filter(re_assigned=True, vendor__isnull=True)
           .select_related("ingredient", "product", "order__user")
           .order_by("-created_at"))
+    qs = scope(qs, request, "order__address__state_id")
     paginator = Paginator(qs, request.GET.get("per_page", 20))
     page = paginator.get_page(request.GET.get("page"))
 

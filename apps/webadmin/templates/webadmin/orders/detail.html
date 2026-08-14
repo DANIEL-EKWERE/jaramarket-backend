@@ -19,6 +19,11 @@
                 {% csrf_token %}<button class="btn-primary">Mark Completed</button>
             </form>
             {% endif %}
+            {% if can_manage and order.status == "completed" %}
+            <form method="post" action="{% url 'webadmin:order_mark_received' order.id %}" data-confirm="Confirm on the customer's behalf that this order was received? This closes the order.">
+                {% csrf_token %}<button class="btn-primary">Mark Received</button>
+            </form>
+            {% endif %}
             <a href="{% url 'webadmin:orders_list' %}" class="btn-secondary">Back</a>
         </div>
     </div>
@@ -31,7 +36,7 @@
             <dl class="space-y-2 text-sm">
                 <div class="flex justify-between"><dt class="text-slate-400">Customer</dt><dd class="text-slate-800">{{ order.user.name|default:"N/A" }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Email</dt><dd class="text-slate-800">{{ order.user.email|default:"—" }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-400">Status</dt><dd><span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' or order.status == 'delivered' %}info{% elif order.status == 'completed' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span></dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">Status</dt><dd><span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' or order.status == 'delivered' or order.status == 'completed' or order.status == 'in_transit' %}info{% elif order.status == 'received' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span></dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Delivery Type</dt><dd class="text-slate-800">{{ order.delivery_type }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Address</dt><dd class="text-slate-800">{{ order.address.contact_address|default:"—" }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Date</dt><dd class="text-slate-800">{{ order.created_at }}</dd></div>

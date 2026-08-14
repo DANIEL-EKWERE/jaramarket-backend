@@ -40,7 +40,7 @@ class Command(BaseCommand):
             items = list(order.items.filter(ingredient__isnull=False,
                                             vendor__isnull=True,
                                             market__isnull=True,
-                                            status="pending"))
+                                            status__in=("pending", "unavailable")))
             if not items:
                 continue
             if not order.address or order.address.latitude is None:
@@ -82,7 +82,7 @@ class Command(BaseCommand):
         if options.get("all"):
             stuck_ids = (OrderItem.objects
                          .filter(ingredient__isnull=False, vendor__isnull=True,
-                                 market__isnull=True, status="pending")
+                                 market__isnull=True, status__in=("pending", "unavailable"))
                          .values_list("order_id", flat=True).distinct())
             return Order.objects.filter(id__in=stuck_ids).select_related("address")
         raise CommandError("Pass --order, --reference, or --all.")

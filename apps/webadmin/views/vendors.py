@@ -12,6 +12,7 @@ from apps.accounts.models import Roles, User
 from apps.finance.models import Wallet
 from apps.orders.models import OrderItem, OrderItemLog
 from ..decorators import perm_required
+from ..scoping import ensure_in_scope, scope
 
 
 @perm_required("view_vendors")
@@ -19,6 +20,7 @@ def vendors_list_view(request):
     qs = (User.objects.vendors()
           .select_related("state", "vendor_profile", "vendor_profile__market")
           .prefetch_related("categories"))
+    qs = scope(qs, request, "state_id")
     if request.GET.get("state_id"):
         qs = qs.filter(state_id=request.GET["state_id"])
     if request.GET.get("category_id"):
@@ -63,6 +65,7 @@ def vendor_detail_view(request, vendor_id):
     v = User.objects.filter(id=vendor_id, role=Roles.VENDOR).first()
     if not v:
         raise Http404("Vendor not found")
+    ensure_in_scope(request, v.state_id)
     items = OrderItem.objects.filter(vendor=v)
     stats = {
         "total_orders": items.count(),

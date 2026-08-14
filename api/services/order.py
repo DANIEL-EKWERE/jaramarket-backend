@@ -8,7 +8,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 
-from apps.accounts.models import Roles
+from apps.accounts.models import Roles, User
 from apps.catalogue.models import Ingredient, IngredientProduct, Product
 from apps.customers.models import Address
 from apps.finance.models import Commission, DeliveryFee, ServiceFeeTier, TransactionLog, Wallet
@@ -291,6 +291,208 @@ class OrderService:
                     vendor_amount=b["item_total"] - b["commission"],
                     referral=b["referral_commission"], referral_user_id=b["referral_id"],
                     status="pending")
+
+    def replacement_options(self, user, item_id, limit=40):
+        """Ingredients that could actually replace an unavailable item.
+
+        Only offers ones a vendor near the delivery address can genuinely
+        supply -- otherwise the customer would just pick another dead end.
+        """
+        from .dispatch import MarketDispatchService
+
+        item = self._owned_item(user, item_id)
+        order = item.order
+        address = order.address
+        if not address or address.latitude is None:
+            return item, []
+
+        dispatcher = MarketDispatchService()
+        markets = dispatcher.rank_markets(address.latitude, address.longitude)
+        # Which categories can be served near this customer at all?
+        servable = set()
+        for market in markets:
+            for cat_id in User.objects.filter(
+                    role=Roles.VENDOR, is_active=True,
+                    vendor_profile__market=market, vendor_profile__is_active=True,
+            ).values_list("categories__id", flat=True):
+                if cat_id:
+                    servable.add(cat_id)
+        if not servable:
+            return item, []
+
+        qs = (Ingredient.objects.filter(is_active=True, category_id__in=servable)
+              .exclude(id=item.ingredient_id)
+              .select_related("category").order_by("name"))
+        # Respect the same location suspensions the catalogue honours.
+        qs = qs.exclude(state_suspensions__state_id=address.state_id) if address.state_id else qs
+        qs = qs.exclude(lga_suspensions__lga_id=address.lga_id) if address.lga_id else qs
+        return item, list(qs[:limit])
+
+    @transaction.atomic
+    def replace_item(self, user, item_id, ingredient_id, quantity=None):
+        """Swap an unavailable item for one the customer picked, settle the
+        price difference against their wallet, and put it back through
+        dispatch. The order total moves with it so the books stay straight."""
+        from .dispatch import MarketDispatchService
+
+        item = self._owned_item(user, item_id)
+        if item.status != "unavailable":
+            raise ValueError("Only an unavailable item can be replaced.")
+
+        replacement = Ingredient.objects.filter(id=ingredient_id, is_active=True).first()
+        if not replacement:
+            raise ValueError("Replacement ingredient not found.")
+        if replacement.id == item.ingredient_id:
+            raise ValueError("Pick a different ingredient.")
+
+        order = item.order
+        qty = int(quantity or item.quantity or 1)
+        if qty < 1:
+            raise ValueError("Quantity must be at least 1.")
+
+        old_amount = _d(item.amount)
+        new_price = _d(replacement.price)
+        new_amount = new_price * _d(qty)
+        difference = new_amount - old_amount
+
+        # Settle the difference before committing the swap.
+        if difference > 0:
+            wallet = _get_wallet(user.id)
+            if _d(wallet.balance) < difference:
+                raise ValueError(
+                    f"Insufficient wallet balance — you need ₦{difference:.2f} more "
+                    f"for this replacement.")
+            TransactionLogService.debit(
+                user.id, USER_TYPE, difference, order.id, ORDER_TYPE, "NGN",
+                f"Replacement top-up for Order #{order.reference}")
+        elif difference < 0:
+            TransactionLogService.credit(
+                user.id, USER_TYPE, -difference, order.id, ORDER_TYPE, "NGN",
+                f"Replacement refund for Order #{order.reference}")
+
+        b = self._get_bonuses(new_price, qty, order, user)
+        item.ingredient = replacement
+        item.quantity = qty
+        item.price = new_price
+        item.unit = replacement.unit
+        item.amount = b["item_total"]
+        item.commision = b["commission"]
+        item.vendor_amount = b["item_total"] - b["commission"]
+        item.referral = b["referral_commission"]
+        item.referral_user_id = b["referral_id"]
+        item.status = "pending"
+        item.re_assigned = False
+        item.market = None
+        item.save()
+
+        order.total = _d(order.total) + difference
+        order.save(update_fields=["total"])
+
+        # Give the replacement a real shot at a vendor straight away.
+        if order.address and order.address.latitude is not None:
+            MarketDispatchService().resolve([item], order.address)
+        item.refresh_from_db()
+        return item, difference
+
+    def _owned_item(self, user, item_id):
+        item = OrderItem.objects.select_related("order", "ingredient", "product").filter(id=item_id).first()
+        if not item:
+            raise ValueError("Order item not found")
+        if item.order.user_id != user.id and user.role not in Roles.ADMIN_ROLES:
+            raise ValueError("This item is not yours.")
+        return item
+
+    def _logistics_order(self, user, order_id, allowed_statuses):
+        if user.role not in Roles.ADMIN_ROLES:
+            raise ValueError("Logistics or admin access required.")
+        order = Order.objects.filter(id=order_id).first()
+        if not order:
+            raise ValueError("Order not found")
+        if order.status not in allowed_statuses:
+            raise ValueError(
+                f"Order #{order.reference} is '{order.status}' — it must be "
+                f"admin-approved before it can be handled by logistics.")
+        return order
+
+    @transaction.atomic
+    def assign_rider(self, user, order_id, rider_id, note=None):
+        """Hand an approved order to an in-house rider. Items are already
+        consolidated at this point, so it's one rider for the whole order."""
+        from apps.orders.models import Delivery
+
+        order = self._logistics_order(user, order_id, ("completed", "in_transit"))
+        rider = User.objects.filter(id=rider_id, is_active=True).first()
+        if not rider:
+            raise ValueError("Rider not found.")
+        if rider.role != Roles.LOGISTICS:
+            raise ValueError("That user is not a logistics rider.")
+
+        delivery, _ = Delivery.objects.get_or_create(order=order)
+        if delivery.status == Delivery.DELIVERED:
+            raise ValueError("This delivery is already completed.")
+        delivery.rider = rider
+        delivery.assigned_at = timezone.now()
+        if delivery.status != Delivery.IN_TRANSIT:
+            delivery.status = Delivery.ASSIGNED
+        if note:
+            delivery.note = note
+        delivery.save()
+        return delivery
+
+    @transaction.atomic
+    def dispatch_delivery(self, user, order_id):
+        """Rider has the goods and is on the way -- this is what actually
+        puts the order in the customer's 'Logistics' stage."""
+        from apps.orders.models import Delivery
+
+        order = self._logistics_order(user, order_id, ("completed",))
+        delivery = Delivery.objects.filter(order=order).first()
+        if not delivery or not delivery.rider_id:
+            raise ValueError("Assign a rider before dispatching.")
+        if delivery.status == Delivery.DELIVERED:
+            raise ValueError("This delivery is already completed.")
+
+        delivery.status = Delivery.IN_TRANSIT
+        delivery.dispatched_at = timezone.now()
+        delivery.save(update_fields=["status", "dispatched_at", "updated_at"])
+        order.status = "in_transit"
+        order.save(update_fields=["status"])
+
+        from ..notifications import order_status_notification
+        order_status_notification(order.user, order, "in_transit")
+        return delivery
+
+    @transaction.atomic
+    def mark_received(self, user, order_id):
+        """Customer-facing final step. Admin approval (mark_completed) is what
+        pays the vendors out and hands the order to logistics; this is the
+        customer confirming the goods actually reached them, which closes
+        the order for good."""
+        order = Order.objects.filter(id=order_id).first()
+        if not order:
+            raise ValueError("Order not found")
+        if order.user_id != user.id and user.role not in Roles.ADMIN_ROLES:
+            raise ValueError("This order is not yours.")
+        if order.status == "received":
+            raise ValueError("This order is already marked as received.")
+        if order.status not in ("completed", "in_transit"):
+            raise ValueError(
+                "This order is not out for delivery yet — it can only be "
+                "marked received after admin approval.")
+
+        order.status = "received"
+        order.save(update_fields=["status"])
+
+        # Close the delivery leg too, so riders' records stay accurate.
+        from apps.orders.models import Delivery
+        delivery = Delivery.objects.filter(order=order).first()
+        if delivery and delivery.status != Delivery.DELIVERED:
+            delivery.status = Delivery.DELIVERED
+            delivery.delivered_at = timezone.now()
+            delivery.save(update_fields=["status", "delivered_at", "updated_at"])
+        from ..notifications import order_status_notification
+        order_status_notification(order.user, order, "received")
+        return order
 
     @transaction.atomic
     def cancel_order(self, order):

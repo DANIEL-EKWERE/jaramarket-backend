@@ -53,6 +53,13 @@ def notify(user, type_name, data, channels=("database",)):
 
 
 def send_email(to, subject, body, html=None):
+    # EMAIL_TEST_REDIRECT reroutes every outbound mail to one inbox so
+    # testing against real data can't spam real customers. Unset (the
+    # production default) means normal delivery.
+    redirect_to = getattr(settings, "EMAIL_TEST_REDIRECT", "")
+    if redirect_to:
+        subject = f"[to: {to}] {subject}"
+        to = redirect_to
     try:
         send_mail(subject, body,
                   getattr(settings, "DEFAULT_FROM_EMAIL", "no-reply@jaraman.local"),
@@ -94,6 +101,26 @@ def order_item_status_notification(user, order_item, status):
         "type": "order_item_status", "title": "Item Update",
         "message": msg, "order_item_id": str(order_item.id), "status": status,
     }, channels=("database", "fcm"))
+
+
+def order_item_unavailable_notification(user, order_item):
+    """Tell the customer an item can't be sourced so they can replace it."""
+    from .email_templates import order_item_unavailable_email
+    name = (order_item.ingredient.name if order_item.ingredient_id
+            else (order_item.product.name if order_item.product_id else "An item"))
+    order = order_item.order
+    msg = f"{name} is unavailable. Tap to choose a replacement."
+    result = notify(user, "OrderItemUnavailableNotification", {
+        "type": "order_item_unavailable", "title": "Item Unavailable",
+        "message": msg, "order_id": str(order.id),
+        "order_item_id": str(order_item.id), "status": "unavailable",
+    }, channels=("database", "fcm"))
+    if user.email:
+        html = order_item_unavailable_email(user.firstname or user.email,
+                                            order.reference, name)
+        send_email(user.email, f"Action needed: an item in order #{order.reference}",
+                   msg, html=html)
+    return result
 
 
 def wallet_notification(user, tx_type, amount, balance, reference, comment):

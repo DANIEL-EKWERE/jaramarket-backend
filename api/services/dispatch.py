@@ -180,7 +180,19 @@ class MarketDispatchService:
         self.escalate(item, "delivery_timeout")
 
     def _send_to_manual_queue(self, items):
+        """No market could fulfil these. They stay in the admin's manual
+        queue (re_assigned=True), but are also flagged `unavailable` so the
+        customer is told and offered a replacement instead of the order
+        silently hanging with their money already taken."""
+        from api.notifications import order_item_unavailable_notification
+
         for item in items:
+            already_flagged = item.status == "unavailable"
             item.re_assigned = True
-            item.status = "pending"
+            item.status = "unavailable"
             item.save(update_fields=["re_assigned", "status"])
+            if not already_flagged and item.order_id and item.order.user:
+                try:
+                    order_item_unavailable_notification(item.order.user, item)
+                except Exception:  # notification must never break dispatch
+                    pass

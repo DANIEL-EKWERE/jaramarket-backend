@@ -216,6 +216,10 @@ EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.
 
 EMAIL_BACKEND = "anymail.backends.brevo.EmailBackend"
 
+# Reroute ALL outbound email to a single inbox (dev/staging only). Leave
+# empty in production so customers get their own mail.
+EMAIL_TEST_REDIRECT = config("EMAIL_TEST_REDIRECT", default="")
+
 ANYMAIL = {
     "BREVO_API_KEY": config("BREVO_API_KEY", default=""),
 }

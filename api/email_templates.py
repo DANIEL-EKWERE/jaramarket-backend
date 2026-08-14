@@ -169,6 +169,24 @@ def order_cancelled_refund_email(firstname, order_ref, amount):
     return _base("Order Cancelled — Refund", body)
 
 
+def order_item_unavailable_email(firstname, order_ref, item_name):
+    """Sent when no market could source one of the customer's items, so they
+    can pick a replacement in the app rather than waiting indefinitely."""
+    return _wrap(f"""
+      <h2 style="margin:0 0 12px;font-size:20px;color:#111">Hi {firstname},</h2>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.6">
+        Unfortunately <strong>{item_name}</strong> in your order
+        <strong>#{order_ref}</strong> is currently unavailable — none of the
+        markets near you can supply it right now.
+      </p>
+      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.6">
+        Open the Jara Market app and tap <strong>Replace</strong> on that item
+        to choose an alternative. Any price difference is settled with your
+        wallet automatically, and the rest of your order continues as normal.
+      </p>
+    """)
+
+
 def new_order_vendor_email(vendor_name, order_ref, items_count):
     body = (
         _h2("You Have a New Order!")

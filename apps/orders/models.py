@@ -126,3 +126,35 @@ class MarketOfferResponse(TimestampedModel):
 
     def __str__(self):
         return f"{self.vendor} — {self.decision}"
+
+
+class Delivery(TimestampedModel):
+    """The last leg: getting an approved order from the hub to the customer.
+
+    One delivery per order — items are consolidated after admin approval, so
+    a single rider carries the whole order regardless of how many markets
+    the items came from. The customer's own "received" confirmation is what
+    finally closes it (see OrderService.mark_received).
+    """
+    ASSIGNED = "assigned"
+    IN_TRANSIT = "in_transit"
+    DELIVERED = "delivered"
+    STATUS_CHOICES = [(ASSIGNED, "assigned"), (IN_TRANSIT, "in_transit"),
+                      (DELIVERED, "delivered")]
+
+    order = models.OneToOneField(Order, on_delete=models.CASCADE,
+                                 db_column="order_id", related_name="delivery")
+    rider = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+                              db_column="rider_id", related_name="deliveries")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=ASSIGNED)
+    assigned_at = models.DateTimeField(null=True, blank=True)
+    dispatched_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    note = models.TextField(null=True, blank=True)
+
+    class Meta:
+        db_table = "deliveries"
+
+    def __str__(self):
+        who = self.rider or "unassigned"
+        return f"{self.order.reference} → {who} ({self.status})"

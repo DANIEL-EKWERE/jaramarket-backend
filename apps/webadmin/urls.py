@@ -18,6 +18,10 @@ urlpatterns = [
     path("orders/<int:order_id>", orders.order_detail_view, name="order_detail"),
     path("orders/<int:order_id>/cancel", orders.order_cancel_view, name="order_cancel"),
     path("orders/<int:order_id>/complete", orders.order_complete_view, name="order_complete"),
+    path("orders/<int:order_id>/received", orders.order_mark_received_view, name="order_mark_received"),
+    path("logistics", orders.logistics_queue_view, name="logistics_queue"),
+    path("orders/<int:order_id>/assign-rider", orders.order_assign_rider_view, name="order_assign_rider"),
+    path("orders/<int:order_id>/dispatch", orders.order_dispatch_view, name="order_dispatch"),
 
     # Finance
     path("finance/transactions", finance.transactions_view, name="finance_transactions"),

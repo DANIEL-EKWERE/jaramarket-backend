@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from apps.accounts.models import Roles, User
 from apps.finance.models import Wallet
 from ..decorators import perm_required
+from ..scoping import scope
 
 
 @perm_required("view_users")
@@ -22,6 +23,7 @@ def users_list_view(request):
     # kept only to satisfy FK integrity on old orders/wallets after a real user was
     # deleted) -- there's nothing meaningful to edit/toggle/delete on those.
     qs = User.objects.filter(id__gt=0, deleted_at__isnull=True).order_by("-created_at")
+    qs = scope(qs, request, "state_id")
     if request.GET.get("role"):
         qs = qs.filter(role=request.GET["role"])
     if request.GET.get("search"):
