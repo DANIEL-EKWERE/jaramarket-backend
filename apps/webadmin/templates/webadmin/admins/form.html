@@ -1,11 +1,11 @@
 {% extends "webadmin/base.html" %}
-{% block page_title %}{% if admin_obj %}Edit Admin{% else %}New Admin{% endif %}{% endblock %}
+{% block page_title %}{% if admin_obj %}Edit Staff{% else %}New Staff{% endif %}{% endblock %}
 {% block content %}
 <div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
     <div class="w-full px-6 lg:px-8 py-4 flex items-center justify-between">
         <div>
-            <div class="breadcrumb"><a href="{% url 'webadmin:admins_list' %}" class="hover:text-emerald-600">Admins</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">{% if admin_obj %}Edit{% else %}New{% endif %}</span></div>
-            <h1 class="page-title">{% if admin_obj %}Edit Admin{% else %}Add Admin{% endif %}</h1>
+            <div class="breadcrumb"><a href="{% url 'webadmin:admins_list' %}" class="hover:text-emerald-600">Staff</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">{% if admin_obj %}Edit{% else %}New{% endif %}</span></div>
+            <h1 class="page-title">{% if admin_obj %}Edit Staff Member{% else %}Add Staff Member{% endif %}</h1>
         </div>
         <a href="{% url 'webadmin:admins_list' %}" class="btn-secondary">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
@@ -22,6 +22,16 @@
             <div><label>Last name</label><input type="text" name="lastname" value="{{ admin_obj.lastname|default:'' }}"></div>
             <div><label>Email <span class="text-red-500">*</span></label><input type="email" name="email" value="{{ admin_obj.email|default:'' }}" required></div>
             <div><label>Phone</label><input type="text" name="phone" value="{{ admin_obj.phone_number|default:'' }}"></div>
+            <div>
+                <label>Role <span class="text-red-500">*</span></label>
+                <select name="role" required>
+                    <option value="">Select a role</option>
+                    {% for r in roles %}
+                    <option value="{{ r.value }}" {% if admin_obj.role == r.value %}selected{% endif %}>{{ r.label }}</option>
+                    {% endfor %}
+                </select>
+                <p class="text-xs text-slate-400 mt-1">Sets what they can reach in the dashboard. Changing it resets their permissions to that role's defaults.</p>
+            </div>
             <div>
                 <label>Password {% if admin_obj %}<span class="text-slate-400 font-normal">(leave blank to keep unchanged)</span>{% endif %}</label>
                 <input type="password" name="password" {% if not admin_obj %}required{% endif %}>
