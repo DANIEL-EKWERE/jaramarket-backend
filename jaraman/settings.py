@@ -201,8 +201,11 @@ GOOGLE_CLIENT_IDS = config("GOOGLE_CLIENT_IDS", default="")
 APPLE_CLIENT_IDS = config("APPLE_CLIENT_IDS", default="")
 
 # Public base URL of this backend, used to build absolute asset URLs (e.g. the
-# logo embedded in transactional emails) that must resolve outside our own domain.
-APP_URL = config("APP_URL", default="https://jaramarket-backend.onrender.com")
+# logo embedded in transactional emails) that must resolve outside our own
+# domain. The default is the live host, so an environment that sets nothing
+# still produces working links -- the previous default pointed at a retired
+# Render deployment, which silently broke the logo in every email.
+APP_URL = config("APP_URL", default="https://api.jaramarket.com.ng")
 
 # ── Email (console backend by default; set EMAIL_* in .env for real SMTP) ──
 EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")

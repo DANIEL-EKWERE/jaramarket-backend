@@ -17,6 +17,13 @@ from apps.support.models import Setting
 from ._base import ORDER_TYPE, USER_TYPE, _d, _setting
 
 
+# Statuses at or past admin approval. Vendors have already been paid at this
+# point, so mark_completed must never run again from any of them -- doing so
+# would credit every vendor a second time.
+PAID_OUT_STATUSES = ("completed", "in_transit", "received")
+UNCOMPLETABLE_STATUSES = PAID_OUT_STATUSES + ("cancelled",)
+
+
 def get_commission(amount, total):
     """Return {'percentage', 'commission'} for a line `amount` within `total`."""
     amount = _d(amount)
@@ -634,8 +641,10 @@ class OrderService:
         order = Order.objects.filter(id=order_id).first()
         if not order:
             raise ValueError("Order not found")
-        if order.status in ("completed", "cancelled"):
-            raise ValueError(f"Order #{order.reference} cannot be marked as completed again.")
+        if order.status in UNCOMPLETABLE_STATUSES:
+            raise ValueError(
+                f"Order #{order.reference} is already '{order.status}' — it cannot be "
+                f"approved again (vendors would be paid twice).")
         order.status = "completed"
         order.save(update_fields=["status"])
         order.items.all().update(status="completed", assurance_user=qa_user,

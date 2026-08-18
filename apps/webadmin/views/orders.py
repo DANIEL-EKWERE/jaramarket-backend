@@ -57,7 +57,11 @@ def order_detail_view(request, order_id):
         item.total_offers = offers.count()
         item.pending_offers = offers.filter(decision="pending", attempt__status="offered").count()
     can_manage = request.user.has_perm_slug("manage_orders")
-    can_complete = request.user.role in Roles.ADMIN_ROLES or request.user.role == Roles.QA
+    from api.services.order import UNCOMPLETABLE_STATUSES
+    is_qa_or_admin = request.user.role in Roles.ADMIN_ROLES or request.user.role == Roles.QA
+    # Approval pays vendors out, so only offer it while the order is actually
+    # still awaiting approval.
+    can_complete = is_qa_or_admin and order.status not in UNCOMPLETABLE_STATUSES
     return render(request, "webadmin/orders/detail.html", {
         "order": order, "items": items, "can_manage": can_manage, "can_complete": can_complete})
 

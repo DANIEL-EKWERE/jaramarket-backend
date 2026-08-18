@@ -14,7 +14,7 @@
                 {% csrf_token %}<button class="btn-danger-soft">Cancel Order</button>
             </form>
             {% endif %}
-            {% if can_complete and order.status != "completed" and order.status != "cancelled" %}
+            {% if can_complete %}
             <form method="post" action="{% url 'webadmin:order_complete' order.id %}" data-confirm="Mark this order as completed? This pays out all vendors involved.">
                 {% csrf_token %}<button class="btn-primary">Mark Completed</button>
             </form>
