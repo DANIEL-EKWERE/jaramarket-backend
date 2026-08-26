@@ -14,6 +14,7 @@ from django.utils import timezone
 from apps.finance.models import PaymentLog, Transfer, Wallet
 from apps.orders.models import Order, OrderItem
 from ..decorators import perm_required
+from ..scoping import scope
 
 
 def _range(request):
@@ -36,6 +37,8 @@ def _csv_response(filename, header, rows):
 def orders_report_view(request):
     start, end = _range(request)
     orders = Order.objects.filter(created_at__date__gte=start, created_at__date__lte=end)
+    # A state rep's report must only cover their own state.
+    orders = scope(orders, request, "address__state_id")
     total_revenue = orders.aggregate(s=Sum("total"))["s"] or 0
     daily = list(orders.values("created_at__date")
                  .annotate(count=Count("id"), revenue=Sum("total"))
@@ -55,7 +58,9 @@ def orders_report_view(request):
 
 @perm_required("view_reports")
 def products_report_view(request):
-    rows = (OrderItem.objects.filter(product__isnull=False)
+    items = scope(OrderItem.objects.filter(product__isnull=False),
+                  request, "order__address__state_id")
+    rows = (items
             .values("product__name")
             .annotate(total_quantity=Sum("quantity"), total_sales=Sum(F("price") * F("quantity")))
             .order_by("-total_quantity"))

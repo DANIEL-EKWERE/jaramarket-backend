@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 from apps.accounts.models import Roles, User
 from apps.finance.models import Wallet
 from ..decorators import perm_required
-from ..scoping import scope
+from ..scoping import ensure_in_scope, scope
 
 
 @perm_required("view_users")
@@ -59,6 +59,7 @@ def user_create_view(request):
 @perm_required("manage_users")
 def user_detail_view(request, user_id):
     user = get_object_or_404(User, id=user_id)
+    ensure_in_scope(request, user.state_id)
     if request.method == "POST":
         for field in ["firstname", "lastname", "email", "role"]:
             if request.POST.get(field):

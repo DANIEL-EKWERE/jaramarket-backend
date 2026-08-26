@@ -36,6 +36,8 @@
                 <label>Password {% if admin_obj %}<span class="text-slate-400 font-normal">(leave blank to keep unchanged)</span>{% endif %}</label>
                 <input type="password" name="password" {% if not admin_obj %}required{% endif %}>
             </div>
+            {% include "webadmin/_permission_picker.html" %}
+
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save</button>
                 <a href="{% url 'webadmin:admins_list' %}" class="btn-secondary">Cancel</a>

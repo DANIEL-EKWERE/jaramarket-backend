@@ -40,6 +40,8 @@
             </div>
             <div><label>LGA <span class="text-red-500">*</span></label><input type="text" name="lga" value="{{ rep.lga|default:'' }}" required></div>
             <div><label>Address <span class="text-red-500">*</span></label><textarea name="address" rows="3" required>{{ rep.address|default:'' }}</textarea></div>
+            {% include "webadmin/_permission_picker.html" %}
+
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save</button>
                 <a href="{% url 'webadmin:representatives_list' %}" class="btn-secondary">Cancel</a>

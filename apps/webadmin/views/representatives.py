@@ -20,6 +20,7 @@ from apps.finance.models import Wallet
 from apps.geo.models import State
 from apps.vendors.models import StateRepresentative
 from ..decorators import perm_required
+from ..permissions_ui import apply_permissions, permission_groups
 
 
 @perm_required("view_representatives")
@@ -49,10 +50,15 @@ def representative_create_view(request):
             Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
             StateRepresentative.objects.create(user=user, state_id=data["state_id"], phone=data["phone"],
                                                 lga=data["lga"], address=data["address"], is_active=True)
+            # Ticked permissions win; otherwise the role's defaults apply.
+            # Without either the account logs in to a blank dashboard, since
+            # every block is gated on has_perm_slug().
+            apply_permissions(user, request)
             messages.success(request, "State representative created successfully.")
             return redirect("webadmin:representatives_list")
     return render(request, "webadmin/representatives/form.html",
-                  {"rep": None, "states": State.objects.order_by("name")})
+                  {"rep": None, "states": State.objects.order_by("name"),
+                   "permission_groups": permission_groups(role=Roles.STATE_REPRESENTATIVE)})
 
 
 @perm_required("manage_representatives")
@@ -78,10 +84,13 @@ def representative_update_view(request, id):
             rep.lga = data["lga"]
             rep.address = data["address"]
             rep.save()
+            apply_permissions(rep.user, request)
             messages.success(request, "State representative updated successfully.")
             return redirect("webadmin:representatives_list")
-    return render(request, "webadmin/representatives/form.html",
-                  {"rep": rep, "states": State.objects.order_by("name")})
+    return render(request, "webadmin/representatives/form.html", {
+        "rep": rep, "states": State.objects.order_by("name"),
+        "permission_groups": permission_groups(
+            rep.user.permissions_m2m.values_list("slug", flat=True), rep.user.role)})
 
 
 @require_POST

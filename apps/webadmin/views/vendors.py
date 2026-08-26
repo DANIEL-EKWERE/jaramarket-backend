@@ -86,6 +86,7 @@ def vendor_orders_view(request, vendor_id):
     a per-vendor order-items list (not shown anywhere on vendor_detail_view,
     which only has aggregate stats)."""
     v = get_object_or_404(User, id=vendor_id, role=Roles.VENDOR)
+    ensure_in_scope(request, v.state_id)
     qs = (OrderItem.objects.filter(vendor=v)
           .select_related("order", "order__user", "order__address", "ingredient", "ingredient__category")
           .order_by("-created_at"))

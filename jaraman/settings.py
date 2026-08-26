@@ -193,12 +193,7 @@ FIREBASE_CREDENTIALS = config("FIREBASE_CREDENTIALS", default="")
 
 PAYMENT_DEFAULT_GATEWAY = config("PAYMENT_DEFAULT_GATEWAY", default="paystack")
 
-# Comma-separated Google OAuth client IDs (Android, iOS, Web). Get from Google Cloud Console.
-GOOGLE_CLIENT_IDS = config("GOOGLE_CLIENT_IDS", default="")
 
-# Comma-separated Apple Sign-In audiences: the iOS bundle IDs of the apps
-# (and the Services ID if web/Android flow is ever added). From Apple Developer portal.
-APPLE_CLIENT_IDS = config("APPLE_CLIENT_IDS", default="")
 
 # Public base URL of this backend, used to build absolute asset URLs (e.g. the
 # logo embedded in transactional emails) that must resolve outside our own

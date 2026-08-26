@@ -7,17 +7,25 @@ from django.utils import timezone
 from apps.accounts.models import User
 from apps.orders.models import Order, OrderItem
 from ..decorators import admin_required
+from ..scoping import scoped_states
 
 
 @admin_required
 def dashboard_view(request):
     user = request.user
-    state_id = user.state_id if user.is_state_admin() else None
+    # State admins are scoped by their own profile state; state reps by the
+    # state(s) they represent (scoped_states). Everyone else sees nationwide.
+    state_ids = scoped_states(request)
+    if not state_ids and user.is_state_admin() and user.state_id:
+        state_ids = [user.state_id]
     stats = {}
 
+    def _scope(qs, path):
+        return qs.filter(**{f"{path}__in": state_ids}) if state_ids else qs
+
     def order_qs():
-        qs = Order.objects.all()
-        return qs.filter(user__state_id=state_id) if state_id else qs
+        # Orders belong to a state via their delivery address.
+        return _scope(Order.objects.all(), "address__state_id")
 
     if user.has_perm_slug("view_orders"):
         oq = order_qs()
@@ -29,15 +37,14 @@ def dashboard_view(request):
             "cancelled_orders": oq.filter(status="cancelled").count(),
         })
     if user.has_perm_slug("view_transactions"):
-        stats["total_revenue"] = Order.objects.filter(status="completed").aggregate(s=Sum("total"))["s"] or 0
-        stats["today_revenue"] = Order.objects.filter(
-            status="completed", created_at__date=timezone.now().date()).aggregate(s=Sum("total"))["s"] or 0
+        rq = order_qs().filter(status="completed")
+        stats["total_revenue"] = rq.aggregate(s=Sum("total"))["s"] or 0
+        stats["today_revenue"] = rq.filter(
+            created_at__date=timezone.now().date()).aggregate(s=Sum("total"))["s"] or 0
     if user.has_perm_slug("view_users"):
-        cq = User.objects.customers()
-        stats["total_customers"] = (cq.filter(state_id=state_id) if state_id else cq).count()
+        stats["total_customers"] = _scope(User.objects.customers(), "state_id").count()
     if user.has_perm_slug("view_vendors"):
-        vq = User.objects.vendors()
-        stats["total_vendors"] = (vq.filter(state_id=state_id) if state_id else vq).count()
+        stats["total_vendors"] = _scope(User.objects.vendors(), "state_id").count()
 
     recent_orders = []
     if user.has_perm_slug("view_orders"):
@@ -45,8 +52,7 @@ def dashboard_view(request):
 
     latest_users = []
     if user.has_perm_slug("view_users"):
-        cq = User.objects.customers()
-        latest_users = (cq.filter(state_id=state_id) if state_id else cq).order_by("-created_at")[:6]
+        latest_users = _scope(User.objects.customers(), "state_id").order_by("-created_at")[:6]
 
     order_status_chart = {}
     if user.has_perm_slug("view_orders"):

@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 from apps.accounts.models import Roles, User
 from apps.finance.models import Wallet
 from ..decorators import perm_required
+from ..permissions_ui import apply_permissions, permission_groups
 
 # Internal staff roles manageable from this screen. State representatives are
 # excluded on purpose: they have their own form because they also need a
@@ -64,14 +65,15 @@ def admin_create_view(request):
             admin.set_password(data["password"])
             admin.save()
             Wallet.objects.get_or_create(user=admin, defaults={"balance": 0})
-            # Grant the role's default permissions, otherwise the account can
-            # log in but every page 403s.
-            admin.sync_default_permissions()
+            # Ticked permissions win; otherwise fall back to the role's
+            # defaults -- without either, the account logs in to 403s.
+            apply_permissions(admin, request)
             messages.success(request,
                              f"{ROLE_LABELS.get(admin.role, admin.role).title()} created successfully.")
             return redirect("webadmin:admins_list")
     return render(request, "webadmin/admins/form.html",
-                  {"admin_obj": None, "roles": _role_options()})
+                  {"admin_obj": None, "roles": _role_options(),
+                   "permission_groups": permission_groups()})
 
 
 @perm_required("manage_admins")
@@ -90,13 +92,15 @@ def admin_update_view(request, admin_id):
         if role_changed:
             admin.role = new_role
         admin.save()
-        if role_changed:
-            # The old role's permissions would otherwise linger.
-            admin.sync_default_permissions()
+        # An explicit selection always wins. With none ticked we fall back to
+        # the role's defaults, which also re-syncs after a role change.
+        apply_permissions(admin, request)
         messages.success(request, "Staff member updated successfully.")
         return redirect("webadmin:admins_list")
-    return render(request, "webadmin/admins/form.html",
-                  {"admin_obj": admin, "roles": _role_options()})
+    return render(request, "webadmin/admins/form.html", {
+        "admin_obj": admin, "roles": _role_options(),
+        "permission_groups": permission_groups(
+            admin.permissions_m2m.values_list("slug", flat=True), admin.role)})
 
 
 @require_POST
