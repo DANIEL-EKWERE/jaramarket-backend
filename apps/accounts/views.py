@@ -262,6 +262,29 @@ def pin_reset(request):
     return success("PIN reset successfully")
 
 
+# Tolerance for server/provider clock drift when validating social ID tokens.
+# Without it a server a few seconds slow rejects every login outright.
+SOCIAL_CLOCK_SKEW_SECONDS = 60
+
+APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
+_apple_jwk_client = None
+
+
+def _get_apple_jwk_client():
+    """Apple's signing keys, fetched once and cached.
+
+    A fresh client per request re-downloaded the key set on every single
+    login (~2s each) and turned any blip in outbound network access into a
+    failed sign-in. Apple rotates these keys rarely, so cache them.
+    """
+    global _apple_jwk_client
+    if _apple_jwk_client is None:
+        from jwt import PyJWKClient
+        _apple_jwk_client = PyJWKClient(
+            APPLE_KEYS_URL, cache_keys=True, lifespan=3600, timeout=10)
+    return _apple_jwk_client
+
+
 def _social_signin_response(email, firstname, lastname, role, picture, provider):
     """Shared upsert + token issue for social providers (Google/Apple):
     the provider has already verified the email, so the account is created
@@ -316,7 +339,12 @@ def google_signin(request):
         for client_id in client_ids:
             try:
                 idinfo = google_id_token.verify_oauth2_token(
-                    id_token, google_requests.Request(), client_id
+                    id_token, google_requests.Request(), client_id,
+                    # google-auth allows zero clock skew by default, so a
+                    # server running even a few seconds behind rejects every
+                    # token with "Token used too early". Shared hosting
+                    # drifts, so allow a small window.
+                    clock_skew_in_seconds=SOCIAL_CLOCK_SKEW_SECONDS,
                 )
                 break
             except Exception as exc:
@@ -356,11 +384,20 @@ def apple_signin(request):
     if not client_ids:
         return error("Apple sign-in is not configured on this server.", status=503)
 
-    try:
-        import jwt as pyjwt
-        from jwt import PyJWKClient
+    import jwt as pyjwt
 
-        signing_key = PyJWKClient("https://appleid.apple.com/auth/keys").get_signing_key_from_jwt(identity_token)
+    # Fetching Apple's keys is a separate failure mode from a bad token --
+    # reporting them the same way makes a network problem look like a
+    # rejected login, so keep them apart.
+    try:
+        signing_key = _get_apple_jwk_client().get_signing_key_from_jwt(identity_token)
+    except pyjwt.exceptions.InvalidTokenError as exc:
+        # Unparseable token -- that's the caller's problem, not Apple's.
+        return error(f"Invalid Apple token: {exc}", status=401)
+    except Exception as exc:
+        return error(f"Could not verify with Apple right now: {exc}", status=503)
+
+    try:
         idinfo = None
         last_exc = None
         for client_id in client_ids:
@@ -368,6 +405,8 @@ def apple_signin(request):
                 idinfo = pyjwt.decode(
                     identity_token, signing_key.key, algorithms=["RS256"],
                     audience=client_id, issuer="https://appleid.apple.com",
+                    # Same clock-drift tolerance as Google (see above).
+                    leeway=SOCIAL_CLOCK_SKEW_SECONDS,
                 )
                 break
             except Exception as exc:

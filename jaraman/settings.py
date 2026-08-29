@@ -193,6 +193,27 @@ FIREBASE_CREDENTIALS = config("FIREBASE_CREDENTIALS", default="")
 
 PAYMENT_DEFAULT_GATEWAY = config("PAYMENT_DEFAULT_GATEWAY", default="paystack")
 
+# Comma-separated Google OAuth client IDs (Android, iOS, Web) an ID token may
+# be issued for. These are public identifiers that ship inside the apps, not
+# secrets, so they default to the real values -- an environment that sets no
+# env vars still works instead of returning "not configured". The web client
+# id is what both apps pass as serverClientId, so it is the audience of the
+# tokens they actually send.
+GOOGLE_CLIENT_IDS = config("GOOGLE_CLIENT_IDS", default=",".join([
+    "915451905241-s4d5m4bqg764u142n9biopk0rl6ats8j.apps.googleusercontent.com",  # web (serverClientId)
+    "915451905241-bm4iespv811qjvlqb7qdib2fttrgtvet.apps.googleusercontent.com",
+    "915451905241-d7rd39jm18lrjpqekunvd6ro0ciftfu0.apps.googleusercontent.com",
+    "915451905241-ujq5ng6ki4mbcgj3ssv84f64gii3indt.apps.googleusercontent.com",
+]))
+
+# Apple Sign-In audiences: the iOS bundle ids of the two apps (add a Services
+# ID here if a web/Android flow is ever introduced). Also public identifiers.
+APPLE_CLIENT_IDS = config("APPLE_CLIENT_IDS", default=",".join([
+    "com.jaramarket.customer",
+    "com.jaramarket.vendor",
+]))
+
+
 
 
 # Public base URL of this backend, used to build absolute asset URLs (e.g. the
