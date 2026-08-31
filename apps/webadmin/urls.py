@@ -58,6 +58,7 @@ urlpatterns = [
     path("notifications", notifications.notifications_list_view, name="notifications_list"),
     path("notifications/<uuid:notification_id>/read", notifications.notification_read_view, name="notification_read"),
     path("notifications/mark-all-read", notifications.notifications_mark_all_read_view, name="notifications_mark_all_read"),
+    path("notifications/send", notifications.push_broadcast_view, name="push_broadcast"),
 
     # Catalogue: categories
     path("categories", catalogue.categories_list_view, name="categories_list"),

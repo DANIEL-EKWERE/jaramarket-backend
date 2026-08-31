@@ -44,9 +44,20 @@ def notify(user, type_name, data, channels=("database",)):
         subject = data.get("title", "Jaramarket notification")
         body = data.get("message", "")
         results["mail"] = send_email(user.email, subject, body)
-    if "fcm" in channels and getattr(user, "fcm_token", None):
-        results["fcm"] = FirebasePush().send(user.fcm_token, data.get("title", ""),
-                                             data.get("message", ""), data)
+    if "fcm" in channels:
+        # A push that goes nowhere used to leave no trace at all, which is
+        # how a misconfigured server looked identical to a working one. Say
+        # why it was dropped.
+        if getattr(user, "fcm_token", None):
+            results["fcm"] = FirebasePush().send(user.fcm_token, data.get("title", ""),
+                                                 data.get("message", ""), data)
+        else:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Push skipped for user %s (%s): no fcm_token registered on the "
+                "account -- the app has not called /fcm-token since login.",
+                user.id, user.email)
+            results["fcm"] = {"skipped": True, "reason": "no fcm_token on user"}
     # Live WebSocket push (mirrors Laravel broadcast on the private user channel)
     results["broadcast"] = broadcast_to_user(user.id, data)
     return results
@@ -103,24 +114,63 @@ def order_item_status_notification(user, order_item, status):
     }, channels=("database", "fcm"))
 
 
-def order_item_unavailable_notification(user, order_item):
-    """Tell the customer an item can't be sourced so they can replace it."""
+def _order_item_label(order_item):
+    if order_item.ingredient_id and order_item.ingredient:
+        return order_item.ingredient.name
+    if order_item.product_id and order_item.product:
+        return order_item.product.name
+    return "An item"
+
+
+def order_items_unavailable_notification(user, order, order_items):
+    """Tell the customer which items can't be sourced so they can replace them.
+
+    Deliberately ONE notification (and one email) covering every affected
+    item in the order. Dispatch resolves items individually and recurses, so
+    notifying per item meant a customer with a 9-item order got 9 pushes --
+    several naming the same ingredient, because a food order repeats an
+    ingredient across dishes.
+    """
     from .email_templates import order_item_unavailable_email
-    name = (order_item.ingredient.name if order_item.ingredient_id
-            else (order_item.product.name if order_item.product_id else "An item"))
-    order = order_item.order
-    msg = f"{name} is unavailable. Tap to choose a replacement."
+
+    order_items = list(order_items)
+    if not order_items:
+        return None
+    names = list(dict.fromkeys(_order_item_label(i) for i in order_items))
+
+    if len(names) == 1:
+        msg = f"{names[0]} is unavailable. Tap to choose a replacement."
+    elif len(names) == 2:
+        msg = f"{names[0]} and {names[1]} are unavailable. Tap to choose replacements."
+    else:
+        msg = (f"{names[0]}, {names[1]} and {len(names) - 2} more "
+               f"{'item is' if len(names) - 2 == 1 else 'items are'} unavailable. "
+               f"Tap to choose replacements.")
+
     result = notify(user, "OrderItemUnavailableNotification", {
-        "type": "order_item_unavailable", "title": "Item Unavailable",
+        "type": "order_item_unavailable",
+        "title": "Item Unavailable" if len(names) == 1 else "Items Unavailable",
         "message": msg, "order_id": str(order.id),
-        "order_item_id": str(order_item.id), "status": "unavailable",
+        # Kept for the single-item case so the app can deep-link straight to
+        # the item; the app falls back to the order for a batch.
+        "order_item_id": str(order_items[0].id) if len(order_items) == 1 else "",
+        "order_item_ids": ",".join(str(i.id) for i in order_items),
+        "item_count": str(len(names)),
+        "status": "unavailable",
     }, channels=("database", "fcm"))
+
     if user.email:
         html = order_item_unavailable_email(user.firstname or user.email,
-                                            order.reference, name)
-        send_email(user.email, f"Action needed: an item in order #{order.reference}",
-                   msg, html=html)
+                                            order.reference, names)
+        subject = ("Action needed: an item in order" if len(names) == 1
+                   else "Action needed: items in order")
+        send_email(user.email, f"{subject} #{order.reference}", msg, html=html)
     return result
+
+
+def order_item_unavailable_notification(user, order_item):
+    """Single-item convenience wrapper."""
+    return order_items_unavailable_notification(user, order_item.order, [order_item])
 
 
 def wallet_notification(user, tx_type, amount, balance, reference, comment):
@@ -250,6 +300,11 @@ class FirebasePush:
             return {"skipped": True}
         app = self._get_app()
         if app is None:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Push dropped: Firebase is not initialised (FIREBASE_CREDENTIALS "
+                "= %r). Every notification is a no-op until this is fixed.",
+                getattr(settings, "FIREBASE_CREDENTIALS", ""))
             return {"skipped": True, "reason": "FIREBASE_CREDENTIALS not configured"}
         try:
             from firebase_admin import messaging

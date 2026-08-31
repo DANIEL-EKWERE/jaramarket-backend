@@ -148,6 +148,7 @@ def categories_all_products(request):
             "is_state_price": loc["price_source"] != "default",
             "stock": prod.stock, "image_url": _full_image_url(prod.image_url),
             "rating": prod.rating, "preparation_steps": prod.preparation_steps,
+            "youtube_url": prod.youtube_url,
             "ingredients": ingr_data,
             "created_at": prod.created_at.isoformat() if prod.created_at else None,
         }
@@ -310,6 +311,7 @@ def foods_store(request):
         stock=request.data.get("stock", 0),
         preparation_steps=request.data.get("preparation_steps"),
         image_url=request.data.get("image_url"),
+        youtube_url=request.data.get("youtube_url"),
     )
     for cid in request.data.get("category_ids", []):
         CategoryProduct.objects.get_or_create(product=product, category_id=cid)
@@ -325,7 +327,7 @@ def foods_update(request, id):
         return error("Product not found", status=404)
 
     updatable = ["name", "description", "price", "discount_price",
-                 "stock", "preparation_steps", "image_url"]
+                 "stock", "preparation_steps", "image_url", "youtube_url"]
     for field in updatable:
         if field in request.data:
             setattr(product, field, request.data[field])

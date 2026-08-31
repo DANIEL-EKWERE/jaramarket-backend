@@ -18,6 +18,7 @@ GROUP_LABELS = [
     ("catalogue", "Catalogue"),
     ("finance", "Finance"),
     ("reports", "Reports"),
+    ("send", "Notifications"),
     ("view", "Other — view"),
     ("manage", "Other — manage"),
     ("admin", "System"),

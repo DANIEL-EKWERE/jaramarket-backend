@@ -28,6 +28,24 @@
             <p id="price-auto-hint" class="text-xs text-slate-400 -mt-2 hidden">Auto-calculated as the sum of the linked ingredients' prices below.</p>
             <div><label>Stock</label><input type="number" name="stock" value="{{ product.stock|default:0 }}"></div>
             <div><label>Preparation Steps</label><textarea name="preparation_steps" rows="4">{{ product.preparation_steps|default:'' }}</textarea></div>
+            {% comment %}Feeds the "Watch Video" button on the food detail
+               screen in the customer app. Any YouTube link form is accepted
+               (watch, youtu.be, shorts, embed) -- the server normalises it.{% endcomment %}
+            <div>
+                <label>Recipe Video (YouTube)</label>
+                <input type="url" name="youtube_url" id="youtube-url-input"
+                       placeholder="https://www.youtube.com/watch?v=..."
+                       value="{{ product.youtube_url|default:'' }}">
+                <p class="text-xs text-slate-400 mt-1">Optional. Shown as the “Watch Video” button in the app. Paste any YouTube link — watch, youtu.be, Shorts or embed.</p>
+                <div id="youtube-preview" class="mt-3 hidden">
+                    <div class="aspect-video w-full max-w-md rounded-lg overflow-hidden border border-slate-200 bg-slate-900">
+                        <iframe id="youtube-frame" class="w-full h-full" src="" title="Recipe video preview"
+                                frameborder="0" allowfullscreen
+                                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+                    </div>
+                </div>
+                <p id="youtube-error" class="text-xs text-red-500 mt-1 hidden">That doesn’t look like a YouTube link.</p>
+            </div>
             <div>
                 <label>Product Image</label>
                 <div id="image-dropzone" class="relative overflow-hidden border-2 border-dashed border-slate-300 rounded-xl p-6 text-center cursor-pointer hover:border-emerald-400 hover:bg-emerald-50/30 transition-colors">
@@ -350,6 +368,48 @@
             });
             sync();
             recalcTotal();
+        })();
+
+        // Live preview for the recipe video, so the admin can confirm they
+        // pasted the right link before saving rather than finding out from
+        // the app. Mirrors the server-side parser in views/catalogue.py.
+        (function () {
+            var input = document.getElementById('youtube-url-input');
+            if (!input) return;
+            var preview = document.getElementById('youtube-preview');
+            var frame = document.getElementById('youtube-frame');
+            var err = document.getElementById('youtube-error');
+
+            function videoId(url) {
+                url = (url || '').trim();
+                if (!url) return null;
+                var m = url.match(/(?:youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+                return m ? m[1] : null;
+            }
+
+            function render() {
+                var raw = input.value.trim();
+                var id = videoId(raw);
+                if (!raw) {
+                    preview.classList.add('hidden');
+                    err.classList.add('hidden');
+                    frame.src = '';
+                    return;
+                }
+                if (id) {
+                    err.classList.add('hidden');
+                    preview.classList.remove('hidden');
+                    var next = 'https://www.youtube.com/embed/' + id;
+                    if (frame.src !== next) frame.src = next;   // avoid reloading on every keystroke
+                } else {
+                    preview.classList.add('hidden');
+                    frame.src = '';
+                    err.classList.remove('hidden');
+                }
+            }
+
+            input.addEventListener('input', render);
+            render();
         })();
         </script>
     </div>

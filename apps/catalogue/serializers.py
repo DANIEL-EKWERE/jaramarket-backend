@@ -124,7 +124,7 @@ class ProductSerializer(LocationPricedSerializer):
     class Meta:
         model = Product
         fields = ["id", "name", "description", "price", "discount_price", "is_state_price",
-                  "stock", "image_url", "rating", "preparation_steps",
+                  "stock", "image_url", "rating", "preparation_steps", "youtube_url",
                   "category_ids", "ingredients"]
 
     def _location(self, obj):

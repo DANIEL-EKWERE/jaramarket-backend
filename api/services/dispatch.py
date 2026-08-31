@@ -77,10 +77,27 @@ class MarketDispatchService:
             categories__id=category_id,
         ).distinct()
 
+    def __init__(self):
+        # Resolution recurses (group phase -> leftovers -> per item), and each
+        # branch can strand items. Collect them across the whole run so the
+        # customer gets ONE "items unavailable" push per order instead of one
+        # per item.
+        self._batch_depth = 0
+        self._pending_unavailable = []
+
     def resolve(self, items, address):
         """Assign each item in `items` (an iterable of OrderItem, all with an
         ingredient set) to the closest market that can fulfil it. Items a
         market can't cover recurse into their own independent resolution."""
+        self._batch_depth += 1
+        try:
+            self._resolve(items, address)
+        finally:
+            self._batch_depth -= 1
+            if self._batch_depth == 0:
+                self._flush_unavailable()
+
+    def _resolve(self, items, address):
         items = [i for i in items if i.ingredient_id]
         if not items:
             return
@@ -184,15 +201,36 @@ class MarketDispatchService:
         queue (re_assigned=True), but are also flagged `unavailable` so the
         customer is told and offered a replacement instead of the order
         silently hanging with their money already taken."""
-        from api.notifications import order_item_unavailable_notification
-
         for item in items:
             already_flagged = item.status == "unavailable"
             item.re_assigned = True
             item.status = "unavailable"
             item.save(update_fields=["re_assigned", "status"])
-            if not already_flagged and item.order_id and item.order.user:
-                try:
-                    order_item_unavailable_notification(item.order.user, item)
-                except Exception:  # notification must never break dispatch
-                    pass
+            # Only a NEW failure is worth telling the customer about --
+            # re-running dispatch shouldn't re-notify.
+            if not already_flagged and item.order_id and item.order.user_id:
+                self._pending_unavailable.append(item)
+        if self._batch_depth == 0:
+            # Reached outside a resolve() run (escalation, delivery timeout):
+            # nothing is going to flush this later, so send it now.
+            self._flush_unavailable()
+
+    def _flush_unavailable(self):
+        """Send one notification per affected order, then clear the batch."""
+        from api.notifications import order_items_unavailable_notification
+
+        pending, self._pending_unavailable = self._pending_unavailable, []
+        if not pending:
+            return
+        by_order = {}
+        for item in pending:
+            by_order.setdefault(item.order_id, []).append(item)
+        for order_items in by_order.values():
+            order = order_items[0].order
+            try:
+                order_items_unavailable_notification(order.user, order, order_items)
+            except Exception:  # notification must never break dispatch
+                import logging
+                logging.getLogger(__name__).exception(
+                    "Failed to send unavailable-items notification for order %s",
+                    order.id)

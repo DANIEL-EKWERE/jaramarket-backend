@@ -47,6 +47,10 @@ class Product(TimestampedModel):
     preparation_steps = models.TextField(null=True, blank=True)
     rating = models.FloatField(null=True, blank=True)
     image_url = models.CharField(max_length=255, null=True, blank=True)
+    # Recipe walkthrough on YouTube, surfaced as the app's "Watch Video"
+    # button. Stored as the raw link the admin pastes; the app normalises it
+    # to a watch URL so any share/short/embed form works.
+    youtube_url = models.CharField(max_length=500, null=True, blank=True)
     is_active = models.BooleanField(default=True)
     categories = models.ManyToManyField(Category, through="CategoryProduct", related_name="products")
 

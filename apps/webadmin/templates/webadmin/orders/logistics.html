@@ -28,15 +28,49 @@
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Reference</th><th>Customer</th><th>Deliver to</th><th>Rider</th><th>Status</th><th class="text-right">Action</th></tr></thead>
+                <thead><tr><th>Reference</th><th>Customer &amp; contact</th><th>Deliver to</th><th>Rider</th><th>Status</th><th class="text-right">Action</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for order in page %}
                     <tr>
                         <td class="font-mono text-xs text-slate-500">
                             <a href="{% url 'webadmin:order_detail' order.id %}" class="hover:text-emerald-600">{{ order.reference }}</a>
                         </td>
-                        <td class="font-medium text-slate-800">{{ order.user.name|default:"N/A" }}</td>
-                        <td class="text-slate-500 text-xs">{{ order.address.contact_address|default:"—"|truncatechars:46 }}</td>
+                        {% comment %}The rider works off this row, so the contact
+                           number and the full drop-off address have to be here --
+                           not one click away on the detail page. The delivery
+                           address carries its own phone; fall back to the
+                           account's when that one was left blank.{% endcomment %}
+                        <td class="font-medium text-slate-800">
+                            {{ order.user.name|default:"N/A" }}
+                            {% with phone=order.address.phone_number|default:order.user.phone_number %}
+                            {% if phone %}
+                            <div class="text-xs font-normal mt-0.5">
+                                <a href="tel:{{ phone }}" class="text-emerald-600 hover:underline">{{ phone }}</a>
+                            </div>
+                            {% else %}
+                            <div class="text-xs font-normal text-slate-400 mt-0.5">No phone on file</div>
+                            {% endif %}
+                            {% endwith %}
+                            {% if order.user.email %}
+                            <div class="text-xs font-normal text-slate-400">{{ order.user.email }}</div>
+                            {% endif %}
+                        </td>
+                        <td class="text-slate-500 text-xs" style="max-width:260px">
+                            <div class="text-slate-600">{{ order.address.contact_address|default:"—" }}</div>
+                            {% if order.address.lga or order.address.state %}
+                            <div class="text-slate-400 mt-0.5">
+                                {{ order.address.lga.name|default:"" }}{% if order.address.lga and order.address.state %}, {% endif %}{{ order.address.state.name|default:"" }}
+                            </div>
+                            {% endif %}
+                            {% if order.address.latitude and order.address.longitude %}
+                            <a href="https://www.google.com/maps/search/?api=1&amp;query={{ order.address.latitude }},{{ order.address.longitude }}"
+                               target="_blank" rel="noopener"
+                               class="inline-flex items-center gap-1 text-emerald-600 hover:underline mt-1">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                Open in Maps
+                            </a>
+                            {% endif %}
+                        </td>
                         <td>
                             {% if order.delivery_row.rider %}
                             {{ order.delivery_row.rider }}

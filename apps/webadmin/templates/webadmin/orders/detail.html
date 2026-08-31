@@ -30,15 +30,13 @@
 </div>
 
 <div class="w-full px-6 lg:px-8 py-6 space-y-5">
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
         <div class="card p-6">
             <h2 class="text-sm font-semibold text-slate-800 mb-3">Order Info</h2>
             <dl class="space-y-2 text-sm">
                 <div class="flex justify-between"><dt class="text-slate-400">Customer</dt><dd class="text-slate-800">{{ order.user.name|default:"N/A" }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-400">Email</dt><dd class="text-slate-800">{{ order.user.email|default:"—" }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Status</dt><dd><span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' or order.status == 'delivered' or order.status == 'completed' or order.status == 'in_transit' %}info{% elif order.status == 'received' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span></dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Delivery Type</dt><dd class="text-slate-800">{{ order.delivery_type }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-400">Address</dt><dd class="text-slate-800">{{ order.address.contact_address|default:"—" }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Date</dt><dd class="text-slate-800">{{ order.created_at }}</dd></div>
                 {% if order.remarks %}<div class="flex justify-between"><dt class="text-slate-400">Remarks</dt><dd class="text-slate-800">{{ order.remarks }}</dd></div>{% endif %}
                 {% if order.audio %}
@@ -56,6 +54,61 @@
                 <div class="flex justify-between"><dt class="text-slate-400">Service Charge</dt><dd class="font-mono">₦{{ order.service_charge }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">VAT</dt><dd class="font-mono">₦{{ order.vat }}</dd></div>
                 <div class="flex justify-between border-t border-slate-100 pt-2 mt-2"><dt class="font-semibold text-slate-800">Total</dt><dd class="font-mono font-bold text-slate-900">₦{{ order.total }}</dd></div>
+            </dl>
+        </div>
+        {% comment %}Whoever is running the last leg needs to reach the customer
+           and find the door without leaving this page, so contact details and
+           the drop-off address get their own card rather than a line in the
+           order summary.{% endcomment %}
+        <div class="card p-6">
+            <h2 class="text-sm font-semibold text-slate-800 mb-3">Delivery &amp; Contact</h2>
+            <dl class="space-y-2 text-sm">
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-400 shrink-0">Phone</dt>
+                    <dd class="text-right">
+                        {% with phone=order.address.phone_number|default:order.user.phone_number %}
+                        {% if phone %}
+                        <a href="tel:{{ phone }}" class="text-emerald-600 hover:underline font-medium">{{ phone }}</a>
+                        {% else %}<span class="text-slate-400">No phone on file</span>{% endif %}
+                        {% endwith %}
+                    </dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-400 shrink-0">Email</dt>
+                    <dd class="text-right text-slate-800 break-all">
+                        {% if order.user.email %}<a href="mailto:{{ order.user.email }}" class="hover:text-emerald-600">{{ order.user.email }}</a>{% else %}—{% endif %}
+                    </dd>
+                </div>
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-400 shrink-0">Address</dt>
+                    <dd class="text-right text-slate-800">{{ order.address.contact_address|default:"—" }}</dd>
+                </div>
+                {% if order.address.lga or order.address.state %}
+                <div class="flex justify-between gap-4">
+                    <dt class="text-slate-400 shrink-0">Area</dt>
+                    <dd class="text-right text-slate-800">{{ order.address.lga.name|default:"" }}{% if order.address.lga and order.address.state %}, {% endif %}{{ order.address.state.name|default:"" }}</dd>
+                </div>
+                {% endif %}
+                {% if order.delivery.rider %}
+                <div class="flex justify-between gap-4 border-t border-slate-100 pt-2 mt-2">
+                    <dt class="text-slate-400 shrink-0">Rider</dt>
+                    <dd class="text-right text-slate-800">
+                        {{ order.delivery.rider.name }}
+                        {% if order.delivery.rider.phone_number %}
+                        <div class="text-xs"><a href="tel:{{ order.delivery.rider.phone_number }}" class="text-emerald-600 hover:underline">{{ order.delivery.rider.phone_number }}</a></div>
+                        {% endif %}
+                    </dd>
+                </div>
+                {% endif %}
+                {% if order.address.latitude and order.address.longitude %}
+                <div class="pt-2">
+                    <a href="https://www.google.com/maps/search/?api=1&amp;query={{ order.address.latitude }},{{ order.address.longitude }}"
+                       target="_blank" rel="noopener" class="btn-secondary text-xs inline-flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        Open in Maps
+                    </a>
+                </div>
+                {% endif %}
             </dl>
         </div>
     </div>

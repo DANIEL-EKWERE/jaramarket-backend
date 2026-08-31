@@ -123,6 +123,29 @@ def _save_uploaded_image(uploaded_file, subfolder):
 # Food-type categories are the ones shown on the jara-user app and attached to
 # Products; Vendor-type categories are the ones a vendor picks during
 # onboarding and are shared with Ingredients. They must never be cross-offered.
+def _normalise_youtube_url(raw):
+    """Return (canonical_watch_url, error) for a pasted YouTube link.
+
+    Admins paste whatever the YouTube share sheet gave them -- youtu.be
+    short links, /shorts/, /embed/, /live/, or a watch URL trailing a
+    playlist and timestamp. Store one canonical form so the app never has to
+    guess, and reject anything that isn't YouTube rather than shipping a
+    dead button to customers. Empty input clears the field.
+    """
+    import re
+
+    raw = (raw or "").strip()
+    if not raw:
+        return None, None
+    match = re.search(
+        r"(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|live/|v/)"
+        r"|youtu\.be/)([A-Za-z0-9_-]{11})",
+        raw)
+    if not match:
+        return None, "That doesn't look like a YouTube link — the recipe video was not saved."
+    return f"https://www.youtube.com/watch?v={match.group(1)}", None
+
+
 FOOD_CATEGORY_TYPE_ID = 1
 VENDOR_CATEGORY_TYPE_ID = 2
 
@@ -210,11 +233,14 @@ def product_create_view(request):
             uploaded_image = request.FILES.get("image_file")
             if uploaded_image:
                 image_url = _save_uploaded_image(uploaded_image, "products")
+            youtube_url, youtube_error = _normalise_youtube_url(request.POST.get("youtube_url"))
+            if youtube_error:
+                messages.warning(request, youtube_error)
             p = Product.objects.create(
                 name=request.POST["name"], description=request.POST.get("description"),
                 price=request.POST.get("price") or 0, discount_price=request.POST.get("discount_price") or None,
                 stock=request.POST.get("stock") or 0, preparation_steps=request.POST.get("preparation_steps"),
-                image_url=image_url)
+                image_url=image_url, youtube_url=youtube_url)
             for cid in request.POST.getlist("category_ids"):
                 CategoryProduct.objects.get_or_create(product=p, category_id=cid)
             _sync_price_overrides(p.state_prices, "state", "discount_price",
@@ -246,6 +272,14 @@ def product_update_view(request, id):
         uploaded_image = request.FILES.get("image_file")
         if uploaded_image:
             p.image_url = _save_uploaded_image(uploaded_image, "products")
+        if "youtube_url" in request.POST:
+            youtube_url, youtube_error = _normalise_youtube_url(request.POST["youtube_url"])
+            if youtube_error:
+                # Keep whatever was already saved rather than replacing a
+                # working link with a broken one.
+                messages.warning(request, youtube_error)
+            else:
+                p.youtube_url = youtube_url
         p.save()
         category_ids = request.POST.getlist("category_ids")
         CategoryProduct.objects.filter(product=p).exclude(category_id__in=category_ids).delete()

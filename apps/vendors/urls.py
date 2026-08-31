@@ -3,4 +3,5 @@ from . import views as v
 
 urlpatterns = [
     path("markets", v.markets_collection),
+    path("vendor/shop-profile", v.vendor_shop_profile),
 ]

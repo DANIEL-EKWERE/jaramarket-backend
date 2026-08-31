@@ -423,7 +423,7 @@ def product_create(request):
         name=request.data["name"], description=request.data.get("description"),
         price=request.data.get("price", 0), discount_price=request.data.get("discount_price"),
         stock=request.data.get("stock", 0), preparation_steps=request.data.get("preparation_steps"),
-        image_url=request.data.get("image_url"))
+        image_url=request.data.get("image_url"), youtube_url=request.data.get("youtube_url"))
     for cid in request.data.get("category_ids", []):
         CategoryProduct.objects.get_or_create(product=p, category_id=cid)
     for ing in request.data.get("ingredients", []):
@@ -444,7 +444,7 @@ def product_detail(request, id):
         p.delete()
         return success("Product deleted successfully")
     for field in ["name", "description", "price", "discount_price", "stock",
-                  "preparation_steps", "image_url"]:
+                  "preparation_steps", "image_url", "youtube_url"]:
         if request.data.get(field) is not None:
             setattr(p, field, request.data[field])
     p.save()

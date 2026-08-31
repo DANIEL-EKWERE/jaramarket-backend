@@ -31,6 +31,7 @@ class Roles:
         "view_franchises", "manage_franchises",
         "view_representatives", "manage_representatives",
         "view_markets", "manage_markets",
+        "send_notifications",
     ]
     DEFAULT_PERMISSIONS = {
         STATE_ADMIN: ["view_dashboard", "view_orders", "manage_orders", "view_users", "manage_users",

@@ -189,7 +189,28 @@ FLUTTERWAVE_BASE_URL = config("FLUTTERWAVE_BASE_URL", default="https://api.flutt
 TERMII_API_KEY = config("TERMII_API_KEY", default="")
 TERMII_SENDER_ID = config("TERMII_SENDER_ID", default="Jaramarket")
 TERMII_BASE_URL = config("TERMII_BASE_URL", default="https://api.ng.termii.com")
-FIREBASE_CREDENTIALS = config("FIREBASE_CREDENTIALS", default="")
+# Firebase service-account JSON for push. Two things bite here, and both
+# made every push a silent no-op in production:
+#   * production runs without a .env, so config() fell back to "" and the
+#     sender skipped outright;
+#   * a bare filename was resolved against the CURRENT WORKING DIRECTORY,
+#     which under a WSGI server is not the project root.
+# So: glob for the key file next to manage.py by default, and force any
+# relative path to resolve against BASE_DIR. Uploading the JSON to the
+# project root is now enough to make push work with no env vars set.
+# The value may also be the raw JSON itself, which is left alone.
+def _resolve_firebase_credentials():
+    configured = config("FIREBASE_CREDENTIALS", default="")
+    if configured.lstrip().startswith("{"):
+        return configured                      # raw JSON blob
+    if configured:
+        path = Path(configured)
+        return str(path if path.is_absolute() else (BASE_DIR / path))
+    found = sorted(BASE_DIR.glob("*firebase-adminsdk*.json"))
+    return str(found[0]) if found else ""
+
+
+FIREBASE_CREDENTIALS = _resolve_firebase_credentials()
 
 PAYMENT_DEFAULT_GATEWAY = config("PAYMENT_DEFAULT_GATEWAY", default="paystack")
 

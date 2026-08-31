@@ -159,6 +159,130 @@ def order_mark_received(request, order):
 
 
 @api_view(["GET"])
+def order_reorder(request, order):
+    """Rebuild a past order as a fresh cart payload.
+
+    The app's cart is keyed on products and standalone ingredients, but a
+    food order is stored exploded into one row per recipe ingredient scaled
+    by how many of the dish were bought -- so the ordered quantity of the
+    dish itself is only recoverable against the recipe, which lives here.
+    Resolving it server-side also means the customer gets TODAY's prices and
+    today's location rules rather than a replay of what they paid before.
+
+    Read-only: it returns what to put in the cart and lets the customer
+    review and check out, rather than silently charging the wallet again.
+    """
+    from apps.catalogue.serializers import IngredientSerializer, ProductSerializer
+    from apps.catalogue.models import IngredientProduct
+
+    obj = _svc.get_order_by_id(request.user, order)
+    if not obj:
+        return error("Order not found", status=404)
+
+    state_id = request.query_params.get("state_id")
+    lga_id = request.query_params.get("lga_id")
+    # Default to where the original order was delivered, so a reorder is
+    # priced for the same place unless the app says otherwise.
+    if state_id is None and obj.address_id:
+        state_id = obj.address.state_id
+        lga_id = obj.address.lga_id
+    context = {"request": request, "state_id": state_id, "lga_id": lga_id}
+
+    products, ingredients, unavailable = {}, {}, []
+
+    def _drop(name):
+        if name and name not in unavailable:
+            unavailable.append(name)
+
+    product_rows_by_id = {}
+    for item in obj.items.select_related("product", "ingredient").all():
+        if item.product_id:
+            product = item.product
+            if not product.is_active or product.is_suspended_in(
+                    state_id=state_id, lga_id=lga_id):
+                _drop(product.name)
+                continue
+            # Every recipe row of a dish carries the same ordered quantity,
+            # so collect them all and decide from the set -- one row alone
+            # can be missing its recipe link and give the wrong answer.
+            products[product.id] = (product, None)
+            product_rows_by_id.setdefault(product.id, []).append(item)
+        elif item.ingredient_id:
+            ingredient = item.ingredient
+            if not ingredient.is_active or ingredient.is_suspended_in(
+                    state_id=state_id, lga_id=lga_id):
+                _drop(ingredient.name)
+                continue
+            if ingredient.id in ingredients:
+                continue
+            ingredients[ingredient.id] = (ingredient, max(1, int(item.quantity or 1)))
+
+    products = {pid: (product, _ordered_quantity(product_rows_by_id[pid], IngredientProduct))
+                for pid, (product, _) in products.items()}
+
+    product_rows = []
+    for product, quantity in products.values():
+        row = ProductSerializer(product, context=context).data
+        row["order_quantity"] = quantity
+        product_rows.append(row)
+
+    ingredient_rows = []
+    for ingredient, quantity in ingredients.values():
+        row = IngredientSerializer(ingredient, context=context).data
+        row["order_quantity"] = quantity
+        ingredient_rows.append(row)
+
+    if not product_rows and not ingredient_rows:
+        return error("None of the items on this order can be ordered again "
+                     "right now.", status=422)
+
+    return success("Reorder items retrieved successfully", {
+        "order_id": obj.id,
+        "reference": obj.reference,
+        "products": product_rows,
+        "ingredients": ingredient_rows,
+        # Named so the app can tell the customer what it could not bring back
+        # instead of quietly handing them a shorter cart.
+        "unavailable": unavailable,
+    })
+
+
+def _ordered_quantity(items, IngredientProduct):
+    """How many of the dish this set of exploded recipe rows represents.
+
+    _save_food writes quantity = recipe_quantity * ordered_quantity, so
+    dividing by the recipe quantity recovers the original. The default of 1
+    for a blank recipe quantity mirrors _recipe_lines (`link.quantity or 1`),
+    which is what wrote these rows in the first place.
+
+    The recipe can have been edited since the order was placed, so rows are
+    read as a set and the most common answer wins rather than trusting
+    whichever row happened to come first -- a single row whose link has since
+    been deleted would otherwise decide it.
+    """
+    votes = {}
+    for item in items:
+        row_quantity = float(item.quantity or 1)
+        if not item.ingredient_id:
+            # Not an exploded recipe row -- already the dish count.
+            votes[max(1, round(row_quantity))] = votes.get(max(1, round(row_quantity)), 0) + 1
+            continue
+        link = IngredientProduct.objects.filter(
+            product_id=item.product_id, ingredient_id=item.ingredient_id).first()
+        if link is None:
+            continue  # recipe row is gone; it can't tell us anything
+        recipe_quantity = float(link.quantity) if link.quantity else 1.0
+        if recipe_quantity <= 0:
+            continue
+        derived = max(1, round(row_quantity / recipe_quantity))
+        votes[derived] = votes.get(derived, 0) + 1
+    if not votes:
+        return 1
+    # Most agreement wins; the larger quantity breaks a tie.
+    return max(votes, key=lambda q: (votes[q], q))
+
+
+@api_view(["GET"])
 @permission_classes([IsAuthenticated, IsVendor])
 def vendor_available_orders(request):
     return success("Available orders retrieved successfully",

@@ -169,22 +169,39 @@ def order_cancelled_refund_email(firstname, order_ref, amount):
     return _base("Order Cancelled — Refund", body)
 
 
-def order_item_unavailable_email(firstname, order_ref, item_name):
-    """Sent when no market could source one of the customer's items, so they
-    can pick a replacement in the app rather than waiting indefinitely."""
-    return _wrap(f"""
-      <h2 style="margin:0 0 12px;font-size:20px;color:#111">Hi {firstname},</h2>
-      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.6">
-        Unfortunately <strong>{item_name}</strong> in your order
-        <strong>#{order_ref}</strong> is currently unavailable — none of the
-        markets near you can supply it right now.
-      </p>
-      <p style="margin:0 0 16px;font-size:15px;color:#444;line-height:1.6">
-        Open the Jara Market app and tap <strong>Replace</strong> on that item
-        to choose an alternative. Any price difference is settled with your
-        wallet automatically, and the rest of your order continues as normal.
-      </p>
-    """)
+def order_item_unavailable_email(firstname, order_ref, item_names):
+    """Sent when no market could source items in the customer's order, so they
+    can pick replacements in the app rather than waiting indefinitely.
+
+    Takes every affected item at once -- one order used to produce one email
+    per item, which meant several near-identical mails landing together.
+    """
+    if isinstance(item_names, str):
+        item_names = [item_names]
+    names = list(dict.fromkeys(item_names))   # keep order, drop repeats
+
+    if len(names) == 1:
+        lead = _p(f"Unfortunately <strong>{names[0]}</strong> in your order "
+                  f"<strong>#{order_ref}</strong> is currently unavailable — none "
+                  f"of the markets near you can supply it right now.")
+    else:
+        listed = "".join(
+            f'<li style="margin:4px 0;color:#555555;font-size:15px;">'
+            f'<strong>{n}</strong></li>' for n in names)
+        lead = (_p(f"Unfortunately these items in your order "
+                   f"<strong>#{order_ref}</strong> are currently unavailable — none "
+                   f"of the markets near you can supply them right now:")
+                + f'<ul style="margin:0 0 12px 20px;padding:0;">{listed}</ul>')
+
+    body = (
+        _h2(f"Hi {firstname},")
+        + lead
+        + _p("Open the Jara Market app and tap <strong>Replace</strong> on "
+             f"{'that item' if len(names) == 1 else 'each item'} to choose "
+             "an alternative. Any price difference is settled with your wallet "
+             "automatically, and the rest of your order continues as normal.")
+    )
+    return _base("Action Needed — Item Unavailable", body)
 
 
 def new_order_vendor_email(vendor_name, order_ref, items_count):

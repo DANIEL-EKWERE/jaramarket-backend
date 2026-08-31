@@ -7,6 +7,7 @@ urlpatterns = [
     path("orders/<int:order>/cancel", v.order_cancel),
     path("orders/<int:order>/complete", v.order_mark_completed),
     path("orders/<int:order>/received", v.order_mark_received),
+    path("orders/<int:order>/reorder", v.order_reorder),
     path("orders/items/<int:item_id>/replacements", v.order_item_replacements),
     path("orders/items/<int:item_id>/replace", v.order_item_replace),
     path("vendor/dashboard", v.vendor_dashboard),

@@ -46,7 +46,9 @@ def orders_list_view(request):
 
 @perm_required("view_orders")
 def order_detail_view(request, order_id):
-    order = get_object_or_404(Order.objects.select_related("user", "address"), id=order_id)
+    order = get_object_or_404(
+        Order.objects.select_related("user", "address", "address__lga", "address__state"),
+        id=order_id)
     ensure_in_scope(request, order.address.state_id if order.address_id else None)
     items = list(order.items.select_related("product", "ingredient", "vendor", "market").all())
     # Offer counts make a stuck item legible: routed to a market but with no
@@ -77,7 +79,8 @@ def logistics_queue_view(request):
     from apps.orders.models import Delivery
 
     qs = (Order.objects.filter(status__in=("completed", "in_transit"))
-          .select_related("user", "address", "delivery", "delivery__rider")
+          .select_related("user", "address", "address__lga", "address__state",
+                          "delivery", "delivery__rider")
           .order_by("status", "-created_at"))
     qs = scope(qs, request, "address__state_id")
     if request.GET.get("state") == "unassigned":
