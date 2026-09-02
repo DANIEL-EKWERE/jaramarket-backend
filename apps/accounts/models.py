@@ -32,11 +32,13 @@ class Roles:
         "view_representatives", "manage_representatives",
         "view_markets", "manage_markets",
         "send_notifications",
+        "view_support", "manage_support",
     ]
     DEFAULT_PERMISSIONS = {
         STATE_ADMIN: ["view_dashboard", "view_orders", "manage_orders", "view_users", "manage_users",
                       "view_vendors", "manage_vendors", "view_transactions", "view_reports",
-                      "view_logistics", "view_categories", "view_products", "view_ingredients"],
+                      "view_logistics", "view_categories", "view_products", "view_ingredients",
+                      "view_support", "manage_support"],
         VENDOR_MANAGER: ["view_dashboard", "view_vendors", "manage_vendors", "view_orders", "manage_orders",
                          "view_reports", "view_logistics", "view_categories", "view_products", "manage_products",
                          "view_ingredients", "view_markets", "manage_markets"],
@@ -49,7 +51,8 @@ class Roles:
         STATE_REPRESENTATIVE: ["view_dashboard", "view_orders", "manage_orders", "view_users",
                                "manage_users", "view_vendors", "manage_vendors",
                                "view_reports", "view_logistics",
-                               "view_categories", "view_products", "view_ingredients"],
+                               "view_categories", "view_products", "view_ingredients",
+                               "view_support", "manage_support"],
     }
 
     @classmethod

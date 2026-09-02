@@ -39,12 +39,10 @@
                 <thead><tr><th class="w-8"></th><th>Image</th><th>Name</th><th>Price</th><th>Stock</th><th>Categories</th><th>Status</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for p in page %}
-                    {% with links=p.ingredientproduct_set.all %}
-                    <tr class="product-row {% if links %}cursor-pointer{% endif %}" {% if links %}data-toggle-target="ingredients-{{ p.id }}"{% endif %}>
+                    {% with links=p.ingredientproduct_set.all %}{% with expandable=True %}
+                    <tr class="product-row cursor-pointer" data-toggle-target="ingredients-{{ p.id }}">
                         <td class="text-center text-slate-400">
-                            {% if links %}
                             <svg class="w-4 h-4 expand-chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-                            {% endif %}
                         </td>
                         <td>
                             {% if p.image_url %}
@@ -72,24 +70,112 @@
                             </div>
                         </td>
                     </tr>
-                    {% if links %}
                     <tr id="ingredients-{{ p.id }}" class="ingredients-row hidden bg-slate-50/60">
                         <td></td>
-                        <td colspan="7" class="py-3 px-4">
-                            <p class="text-xs font-semibold text-slate-500 mb-2">Ingredients</p>
-                            <ul class="space-y-1">
-                                {% for link in links %}
-                                <li class="text-sm text-slate-700 flex items-center gap-2">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>
-                                    {{ link.ingredient.name }}
-                                    {% if link.quantity %}<span class="text-slate-400">— {{ link.quantity }} {{ link.unit|default:link.ingredient.unit }}</span>{% endif %}
-                                </li>
-                                {% endfor %}
-                            </ul>
+                        <td colspan="7" class="py-4 px-4">
+                            <div class="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                                {% comment %}Left: what the recipe costs, line by line, so the
+                                   food's price is traceable without opening the edit page.{% endcomment %}
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-500 mb-2">Recipe &amp; prices</p>
+                                    <div class="bg-white border border-slate-200 rounded-lg overflow-hidden">
+                                        <table class="w-full text-sm">
+                                            <thead class="bg-slate-50 text-xs text-slate-400">
+                                                <tr>
+                                                    <th class="text-left font-medium px-3 py-1.5">Ingredient</th>
+                                                    <th class="text-left font-medium px-3 py-1.5">Qty</th>
+                                                    <th class="text-right font-medium px-3 py-1.5">In this recipe</th>
+                                                    <th class="text-right font-medium px-3 py-1.5">Own price</th>
+                                                    <th class="text-right font-medium px-3 py-1.5">State prices</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-slate-50">
+                                                {% for link in links %}
+                                                <tr>
+                                                    <td class="px-3 py-1.5 text-slate-700">{{ link.ingredient.name }}</td>
+                                                    <td class="px-3 py-1.5 text-slate-400 text-xs">{% if link.quantity %}{{ link.quantity }} {{ link.unit|default:link.ingredient.unit }}{% else %}—{% endif %}</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono">{% if link.price is not None %}₦{{ link.price }}{% else %}<span class="text-slate-300">—</span>{% endif %}</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono text-slate-400">₦{{ link.ingredient.price }}</td>
+                                                    <td class="px-3 py-1.5 text-right text-xs">
+                                                        {% with overrides=link.ingredient.state_prices.all %}
+                                                        {% if overrides %}
+                                                        <span class="badge-info" title="{% for o in overrides %}{{ o.state.name }}: ₦{{ o.price }}{% if not forloop.last %} · {% endif %}{% endfor %}">{{ overrides|length }}</span>
+                                                        {% else %}<span class="text-slate-300">none</span>{% endif %}
+                                                        {% endwith %}
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                            <tfoot class="bg-slate-50">
+                                                <tr>
+                                                    <td colspan="2" class="px-3 py-1.5 text-xs font-semibold text-slate-500">Food price</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono font-semibold text-slate-800">₦{{ p.price }}</td>
+                                                    <td colspan="2"></td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
+                                    <p class="text-xs text-slate-400 mt-2">Ingredient state prices are edited on the <a href="{% url 'webadmin:product_update' p.id %}" class="text-emerald-600 hover:underline">edit page</a>, alongside the recipe.</p>
+                                </div>
+
+                                {% comment %}Right: the food's own state overrides, editable in
+                                   place. This form is safe to nest here -- the list page has no
+                                   surrounding form -- and posts only these fields.{% endcomment %}
+                                <div>
+                                    <p class="text-xs font-semibold text-slate-500 mb-2">State prices for {{ p.name }}</p>
+                                    {% if can_manage %}
+                                    <form method="post" action="{% url 'webadmin:product_state_prices' p.id %}" class="bg-white border border-slate-200 rounded-lg p-3">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                                        <div class="state-price-rows space-y-2">
+                                            {% for sp in p.state_prices.all %}
+                                            <div class="state-price-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+                                                <select name="state_price_id" class="text-xs">
+                                                    {% for st in states %}
+                                                    <option value="{{ st.id }}" {% if st.id == sp.state_id %}selected{% endif %}>{{ st.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <input type="number" step="0.01" name="state_price_price" value="{{ sp.price }}" placeholder="Price" class="text-xs">
+                                                <input type="number" step="0.01" name="state_price_discount" value="{{ sp.discount_price|default:'' }}" placeholder="Discount" class="text-xs">
+                                                <button type="button" class="remove-state-price btn-danger-soft text-xs px-2 py-1">×</button>
+                                            </div>
+                                            {% endfor %}
+                                        </div>
+                                        <template class="state-price-tpl">
+                                            <div class="state-price-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+                                                <select name="state_price_id" class="text-xs">
+                                                    {% for st in states %}
+                                                    <option value="{{ st.id }}">{{ st.name }}</option>
+                                                    {% endfor %}
+                                                </select>
+                                                <input type="number" step="0.01" name="state_price_price" placeholder="Price" class="text-xs">
+                                                <input type="number" step="0.01" name="state_price_discount" placeholder="Discount" class="text-xs">
+                                                <button type="button" class="remove-state-price btn-danger-soft text-xs px-2 py-1">×</button>
+                                            </div>
+                                        </template>
+                                        <p class="state-price-empty text-xs text-slate-400 mt-1 {% if p.state_prices.all %}hidden{% endif %}">No overrides — ₦{{ p.price }} applies everywhere.</p>
+                                        <div class="flex items-center gap-2 mt-3">
+                                            <button type="button" class="add-state-price btn-secondary text-xs px-3 py-1.5">+ Add state</button>
+                                            <button type="submit" class="btn-primary text-xs px-3 py-1.5">Save state prices</button>
+                                        </div>
+                                    </form>
+                                    {% else %}
+                                    <div class="bg-white border border-slate-200 rounded-lg p-3 text-sm">
+                                        {% for sp in p.state_prices.all %}
+                                        <div class="flex justify-between py-0.5">
+                                            <span class="text-slate-600">{{ sp.state.name }}</span>
+                                            <span class="font-mono">₦{{ sp.price }}{% if sp.discount_price %} <span class="text-slate-400 line-through text-xs">₦{{ sp.discount_price }}</span>{% endif %}</span>
+                                        </div>
+                                        {% empty %}
+                                        <p class="text-xs text-slate-400">No overrides — ₦{{ p.price }} applies everywhere.</p>
+                                        {% endfor %}
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </td>
                     </tr>
-                    {% endif %}
-                    {% endwith %}
+                    {% endwith %}{% endwith %}
                 {% empty %}
                     <tr><td colspan="8" class="text-center text-slate-400 py-12">No products found.</td></tr>
                 {% endfor %}
@@ -108,6 +194,28 @@ document.querySelectorAll('.product-row[data-toggle-target]').forEach(function (
         target.classList.toggle('hidden');
         var chevron = row.querySelector('.expand-chevron');
         if (chevron) chevron.classList.toggle('rotate-90');
+    });
+});
+
+// Add/remove state-price rows inside each expanded product. Scoped per form so
+// one product's rows can never end up posted with another's.
+document.querySelectorAll('.ingredients-row form').forEach(function (form) {
+    var rows = form.querySelector('.state-price-rows');
+    var tpl = form.querySelector('.state-price-tpl');
+    var empty = form.querySelector('.state-price-empty');
+    if (!rows || !tpl) return;
+
+    function syncEmpty() {
+        if (empty) empty.classList.toggle('hidden', rows.children.length > 0);
+    }
+    form.querySelector('.add-state-price').addEventListener('click', function () {
+        rows.appendChild(tpl.content.cloneNode(true));
+        syncEmpty();
+    });
+    rows.addEventListener('click', function (e) {
+        if (!e.target.classList.contains('remove-state-price')) return;
+        e.target.closest('.state-price-row').remove();
+        syncEmpty();
     });
 });
 </script>

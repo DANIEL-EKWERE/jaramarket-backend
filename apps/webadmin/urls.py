@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
     auth, dashboard, finance, vendors, users, admins, catalogue, commissions,
     reports, orders, settings_views, profile, notifications, franchises, representatives,
-    markets,
+    markets, support,
 )
 
 app_name = "webadmin"
@@ -60,6 +60,12 @@ urlpatterns = [
     path("notifications/mark-all-read", notifications.notifications_mark_all_read_view, name="notifications_mark_all_read"),
     path("notifications/send", notifications.push_broadcast_view, name="push_broadcast"),
 
+    # Support tickets
+    path("support", support.tickets_list_view, name="tickets_list"),
+    path("support/<int:id>", support.ticket_detail_view, name="ticket_detail"),
+    path("support/<int:id>/reply", support.ticket_reply_view, name="ticket_reply"),
+    path("support/<int:id>/status", support.ticket_status_view, name="ticket_status"),
+
     # Catalogue: categories
     path("categories", catalogue.categories_list_view, name="categories_list"),
     path("categories/create", catalogue.category_create_view, name="category_create"),
@@ -70,6 +76,7 @@ urlpatterns = [
     path("products", catalogue.products_list_view, name="products_list"),
     path("products/create", catalogue.product_create_view, name="product_create"),
     path("products/<int:id>", catalogue.product_update_view, name="product_update"),
+    path("products/<int:id>/state-prices", catalogue.product_state_prices_view, name="product_state_prices"),
     path("products/<int:id>/toggle-status", catalogue.product_toggle_status_view, name="product_toggle_status"),
     path("products/<int:id>/delete", catalogue.product_delete_view, name="product_delete"),
     path("products/<int:id>/suspend", catalogue.product_suspend_view, name="product_suspend"),

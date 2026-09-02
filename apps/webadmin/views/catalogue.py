@@ -102,6 +102,60 @@ def _sync_ingredient_links(product, rows):
     return incoming
 
 
+def _extract_ingredient_state_rows(request):
+    """State-price rows for the ingredients shown on the product form.
+
+    Nested repeating groups don't fit the flat getlist() pattern on their own,
+    so every row carries its own ingredient id alongside the state and price.
+    """
+    return list(zip(
+        request.POST.getlist("ing_state_ingredient"),
+        request.POST.getlist("ing_state_state"),
+        request.POST.getlist("ing_state_price"),
+        request.POST.getlist("ing_state_discount"),
+    ))
+
+
+def _sync_ingredient_state_prices(request, rows):
+    """Replace state overrides for ONLY the ingredients this form rendered.
+
+    The form posts every existing override as a (possibly hidden) row, so an
+    untouched save round-trips unchanged. The `ing_state_sync` list is what
+    makes deletion safe: an ingredient whose panel was never rendered -- a row
+    the admin just added, say -- is absent from it and so is left completely
+    alone, instead of having its real overrides wiped by an empty set.
+
+    These prices belong to the ingredient itself, not to this recipe, so the
+    change is global. The form says so.
+    """
+    from apps.catalogue.models import IngredientStatePrice
+
+    syncable = {int(i) for i in request.POST.getlist("ing_state_sync") if i}
+    if not syncable:
+        return 0
+
+    grouped = {}
+    for ing_id, state_id, price, discount in rows:
+        if not ing_id or not state_id or price in (None, ""):
+            continue
+        ing_id = int(ing_id)
+        if ing_id not in syncable:
+            continue
+        grouped.setdefault(ing_id, {})[int(state_id)] = {
+            "price": price, "discounted_price": discount or None}
+
+    touched = 0
+    for ing_id in syncable:
+        incoming = grouped.get(ing_id, {})
+        existing = IngredientStatePrice.objects.filter(ingredient_id=ing_id)
+        touched += existing.exclude(state_id__in=incoming.keys()).delete()[0]
+        for state_id, data in incoming.items():
+            _, created = IngredientStatePrice.objects.update_or_create(
+                ingredient_id=ing_id, state_id=state_id, defaults=data)
+            touched += 1
+    return touched
+
+
 def _ingredient_rows_total(incoming):
     """A food item's price is the accumulated cost of its recipe -- sum
     each linked ingredient's (editable) row price, once any are linked."""
@@ -216,11 +270,33 @@ def products_list_view(request):
         qs = qs.prefetch_related("categories").order_by("categories__name", "name")
     else:
         qs = qs.order_by("-created_at")
-    qs = qs.distinct().prefetch_related("ingredientproduct_set__ingredient")
+    qs = qs.distinct().prefetch_related(
+        "ingredientproduct_set__ingredient",
+        "ingredientproduct_set__ingredient__state_prices__state",
+        "state_prices__state")
     paginator = Paginator(qs, request.GET.get("per_page", 20))
+    page = paginator.get_page(request.GET.get("page"))
     return render(request, "webadmin/catalogue/products/list.html", {
-        "page": paginator.get_page(request.GET.get("page")),
+        "page": page,
+        "states": State.objects.order_by("name"),
+        "can_manage": request.user.has_perm_slug("manage_products"),
         "categories": Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID).order_by("name")})
+
+
+@require_POST
+@perm_required("manage_products")
+def product_state_prices_view(request, id):
+    """Save just the state-price overrides, from the products list.
+
+    Deliberately narrow: posting the full edit form from a list row would
+    have to carry every other product field and would blank whatever it
+    omitted.
+    """
+    p = get_object_or_404(Product, id=id)
+    _sync_price_overrides(p.state_prices, "state", "discount_price",
+                          _extract_price_rows(request, "state_price"))
+    messages.success(request, f"State prices updated for {p.name}.")
+    return redirect(request.POST.get("next") or "webadmin:products_list")
 
 
 @perm_required("manage_products")
@@ -291,6 +367,7 @@ def product_update_view(request, id):
         if linked_ingredients:
             p.price = _ingredient_rows_total(linked_ingredients)
             p.save(update_fields=["price"])
+        _sync_ingredient_state_prices(request, _extract_ingredient_state_rows(request))
         messages.success(request, "Product updated successfully.")
         return redirect("webadmin:products_list")
     return render(request, "webadmin/catalogue/products/form.html", {

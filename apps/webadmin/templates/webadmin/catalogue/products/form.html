@@ -116,26 +116,80 @@
                 </div>
                 <div id="ingredient-rows" class="space-y-2">
                     {% for link in ingredient_links %}
-                    <div class="ingredient-row grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
-                        <select name="ingredient_id">
-                            {% for ing in ingredients %}
-                            <option value="{{ ing.id }}" data-price="{{ ing.price|default:0 }}" {% if ing.id == link.ingredient_id %}selected{% endif %}>{{ ing.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <input type="number" step="0.01" name="ingredient_quantity" value="{{ link.quantity|default:'' }}" placeholder="Quantity">
-                        <select name="ingredient_unit">
-                            <option value="">Unit</option>
-                            {% for u in uoms %}
-                            <option value="{{ u.code }}" {% if u.code == link.unit %}selected{% endif %}>{{ u.name }}</option>
-                            {% endfor %}
-                        </select>
-                        <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" value="{{ link.price|default_if_none:link.ingredient.price }}" placeholder="Price (₦)">
-                        <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                    <div class="ingredient-block bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        <div class="ingredient-row grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center">
+                            <select name="ingredient_id">
+                                {% for ing in ingredients %}
+                                <option value="{{ ing.id }}" data-price="{{ ing.price|default:0 }}" {% if ing.id == link.ingredient_id %}selected{% endif %}>{{ ing.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" step="0.01" name="ingredient_quantity" value="{{ link.quantity|default:'' }}" placeholder="Quantity">
+                            <select name="ingredient_unit">
+                                <option value="">Unit</option>
+                                {% for u in uoms %}
+                                <option value="{{ u.code }}" {% if u.code == link.unit %}selected{% endif %}>{{ u.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" value="{{ link.price|default_if_none:link.ingredient.price }}" placeholder="Price (₦)">
+                            <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
+                        </div>
+
+                        {% comment %}Marks this ingredient as safe to sync. An ingredient
+                           without this hidden field is never touched, so a row the admin
+                           just added can't wipe overrides we never rendered.{% endcomment %}
+                        <input type="hidden" name="ing_state_sync" value="{{ link.ingredient_id }}">
+                        <div class="mt-2 pl-1">
+                            <button type="button" class="toggle-ing-states text-xs text-emerald-600 hover:underline"
+                                    data-target="ing-states-{{ link.ingredient_id }}">
+                                State prices for {{ link.ingredient.name }}
+                                <span class="text-slate-400">({{ link.ingredient.state_prices.all|length }})</span>
+                            </button>
+                            <div id="ing-states-{{ link.ingredient_id }}" class="ing-state-panel hidden mt-2 bg-white border border-slate-200 rounded-lg p-2">
+                                <p class="text-xs text-amber-600 mb-2">These belong to the ingredient itself — changing them affects every food that uses {{ link.ingredient.name }}, not just this one.</p>
+                                <div class="ing-state-rows space-y-2" data-ingredient="{{ link.ingredient_id }}">
+                                    {% for sp in link.ingredient.state_prices.all %}
+                                    <div class="ing-state-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+                                        <input type="hidden" name="ing_state_ingredient" value="{{ link.ingredient_id }}">
+                                        <select name="ing_state_state" class="text-xs">
+                                            {% for st in states %}
+                                            <option value="{{ st.id }}" {% if st.id == sp.state_id %}selected{% endif %}>{{ st.name }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        <input type="number" step="0.01" name="ing_state_price" value="{{ sp.price }}" placeholder="Price" class="text-xs">
+                                        <input type="number" step="0.01" name="ing_state_discount" value="{{ sp.discounted_price|default:'' }}" placeholder="Discount" class="text-xs">
+                                        <button type="button" class="remove-ing-state btn-danger-soft text-xs px-2 py-1">×</button>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                <p class="ing-state-empty text-xs text-slate-400 mt-1 {% if link.ingredient.state_prices.all %}hidden{% endif %}">No state overrides — ₦{{ link.ingredient.price }} applies everywhere.</p>
+                                <button type="button" class="add-ing-state btn-secondary text-xs px-3 py-1.5 mt-2"
+                                        data-ingredient="{{ link.ingredient_id }}">+ Add state</button>
+                            </div>
+                        </div>
                     </div>
                     {% endfor %}
+
+                    {% comment %}Row template for a new ingredient state price. The ingredient
+                       id is stamped in by JS when the row is added.{% endcomment %}
+                    <template id="ing-state-row-tpl">
+                        <div class="ing-state-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+                            <input type="hidden" name="ing_state_ingredient" value="">
+                            <select name="ing_state_state" class="text-xs">
+                                {% for st in states %}
+                                <option value="{{ st.id }}">{{ st.name }}</option>
+                                {% endfor %}
+                            </select>
+                            <input type="number" step="0.01" name="ing_state_price" placeholder="Price" class="text-xs">
+                            <input type="number" step="0.01" name="ing_state_discount" placeholder="Discount" class="text-xs">
+                            <button type="button" class="remove-ing-state btn-danger-soft text-xs px-2 py-1">×</button>
+                        </div>
+                    </template>
                 </div>
                 <template id="ingredient-row-tpl">
                     <div class="ingredient-row grid grid-cols-[2fr_1fr_1fr_1fr_auto] gap-2 items-center bg-slate-50 border border-slate-200 rounded-lg p-2">
+                        {% comment %}A newly added ingredient gets its state-price panel after
+                           the first save -- we can't render its existing overrides before we
+                           know which ingredient was picked.{% endcomment %}
                         <select name="ingredient_id">
                             {% for ing in ingredients %}
                             <option value="{{ ing.id }}" data-price="{{ ing.price|default:0 }}">{{ ing.name }}</option>
@@ -348,7 +402,8 @@
             });
             container.addEventListener('click', function (e) {
                 if (e.target.classList.contains('remove-ingredient-row')) {
-                    e.target.closest('.ingredient-row').remove();
+                    var block = e.target.closest('.ingredient-block');
+                    (block || e.target.closest('.ingredient-row')).remove();
                     sync();
                     recalcTotal();
                 }
@@ -368,6 +423,53 @@
             });
             sync();
             recalcTotal();
+        })();
+
+        // Per-ingredient state prices. Each panel edits the ingredient's own
+        // overrides, so rows are stamped with the ingredient id they belong to
+        // -- the server groups on that rather than on DOM order.
+        (function () {
+            var tpl = document.getElementById('ing-state-row-tpl');
+            if (!tpl) return;
+            var host = document.getElementById('ingredient-rows');
+
+            host.addEventListener('click', function (e) {
+                var toggle = e.target.closest('.toggle-ing-states');
+                if (toggle) {
+                    var panel = document.getElementById(toggle.dataset.target);
+                    if (panel) panel.classList.toggle('hidden');
+                    return;
+                }
+
+                var addBtn = e.target.closest('.add-ing-state');
+                if (addBtn) {
+                    var panel = addBtn.closest('.ing-state-panel');
+                    var rows = panel.querySelector('.ing-state-rows');
+                    var clone = tpl.content.cloneNode(true);
+                    clone.querySelector('input[name="ing_state_ingredient"]').value =
+                        addBtn.dataset.ingredient;
+                    // Default to a state not already overridden for this
+                    // ingredient, so a new row isn't born as a duplicate.
+                    var used = Array.prototype.map.call(
+                        rows.querySelectorAll('select[name="ing_state_state"]'),
+                        function (sel) { return sel.value; });
+                    var select = clone.querySelector('select[name="ing_state_state"]');
+                    var free = Array.prototype.find.call(select.options, function (opt) {
+                        return used.indexOf(opt.value) === -1;
+                    });
+                    if (free) select.value = free.value;
+                    rows.appendChild(clone);
+                    panel.querySelector('.ing-state-empty').classList.add('hidden');
+                    return;
+                }
+
+                if (e.target.classList.contains('remove-ing-state')) {
+                    var panel = e.target.closest('.ing-state-panel');
+                    e.target.closest('.ing-state-row').remove();
+                    var left = panel.querySelectorAll('.ing-state-row').length;
+                    panel.querySelector('.ing-state-empty').classList.toggle('hidden', left > 0);
+                }
+            });
         })();
 
         // Live preview for the recipe video, so the admin can confirm they

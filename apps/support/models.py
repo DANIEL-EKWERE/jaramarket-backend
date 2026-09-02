@@ -35,6 +35,34 @@ class HelpTicket(TimestampedModel):
         return f"{self.subject} ({self.status})"
 
 
+class TicketReply(TimestampedModel):
+    """One message in a support conversation.
+
+    The ticket itself carries only the customer's opening message, so without
+    this there is nowhere for an answer to live -- an admin could change the
+    status but never actually say anything.
+    """
+    ticket = models.ForeignKey(HelpTicket, on_delete=models.CASCADE,
+                               db_column="ticket_id", related_name="replies")
+    # Null when the staff account is later deleted -- the reply itself must
+    # survive, it is part of the customer's record.
+    author = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+                               db_column="author_id", related_name="ticket_replies")
+    message = models.TextField()
+    # Distinguishes support's answers from the customer's own follow-ups
+    # without having to reason about who the author happened to be.
+    is_staff = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "help_ticket_replies"
+        ordering = ["created_at"]
+        verbose_name_plural = "Ticket replies"
+
+    def __str__(self):
+        who = "Support" if self.is_staff else (self.author or "Customer")
+        return f"{who} on #{self.ticket_id}: {self.message[:40]}"
+
+
 class Advertisement(TimestampedModel):
     TYPE_CHOICES = [("discount", "discount"), ("off", "off"), ("info", "info")]
     STATUS_CHOICES = [("active", "active"), ("stop", "stop")]

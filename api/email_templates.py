@@ -204,6 +204,19 @@ def order_item_unavailable_email(firstname, order_ref, item_names):
     return _base("Action Needed — Item Unavailable", body)
 
 
+def ticket_reply_email(firstname, subject, reply_text):
+    """Support's answer to a help ticket."""
+    body = (
+        _h2(f"Hi {firstname},")
+        + _p(f"Our support team has replied to your ticket "
+             f"<strong>{subject}</strong>:")
+        + _box(_p(reply_text))
+        + _p("You can reply from the Help &amp; Support screen in the Jara Market app, "
+             "and we'll pick it up from there.")
+    )
+    return _base("Support Replied", body)
+
+
 def new_order_vendor_email(vendor_name, order_ref, items_count):
     body = (
         _h2("You Have a New Order!")

@@ -1,0 +1,143 @@
+{% extends "webadmin/base.html" %}
+{% load webadmin_extras %}
+{% block page_title %}Ticket #{{ ticket.id }}{% endblock %}
+{% block content %}
+<div class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="w-full px-6 lg:px-8 py-4 flex items-center justify-between">
+        <div>
+            <div class="breadcrumb"><a href="{% url 'webadmin:tickets_list' %}" class="hover:text-emerald-600">Support</a><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">#{{ ticket.id }}</span></div>
+            <h1 class="page-title">{{ ticket.subject }}</h1>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="badge-{% if ticket.status == 'open' %}warning{% elif ticket.status == 'in_progress' %}info{% elif ticket.status == 'resolved' %}success{% else %}danger{% endif %}">{{ ticket.get_status_display|title }}</span>
+            <a href="{% url 'webadmin:tickets_list' %}" class="btn-secondary">Back</a>
+        </div>
+    </div>
+</div>
+
+<div class="w-full px-6 lg:px-8 py-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div class="lg:col-span-2 space-y-5">
+            <div class="card p-6">
+                <h2 class="text-sm font-semibold text-slate-800 mb-4">Conversation</h2>
+
+                {% comment %}The opening message is part of the thread, not a
+                   separate field -- reading it any other way makes the
+                   conversation start halfway through.{% endcomment %}
+                <div class="space-y-4">
+                    <div class="flex gap-3">
+                        <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold text-slate-600 shrink-0">
+                            {{ ticket.user.firstname|slice:":1"|upper|default:"?" }}
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-baseline gap-2">
+                                <span class="text-sm font-semibold text-slate-800">{{ ticket.user.name|default:"Deleted account" }}</span>
+                                <span class="text-xs text-slate-400">{{ ticket.created_at|date:"M j, Y H:i" }}</span>
+                            </div>
+                            <div class="mt-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 whitespace-pre-line">{{ ticket.message }}</div>
+                            {% if ticket.attachment %}
+                            <a href="{{ ticket.attachment|full_image_url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-emerald-600 hover:underline mt-2">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/></svg>
+                                View attachment
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    {% for r in ticket.replies.all %}
+                    <div class="flex gap-3 {% if r.is_staff %}flex-row-reverse{% endif %}">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 {% if r.is_staff %}bg-emerald-100 text-emerald-700{% else %}bg-slate-200 text-slate-600{% endif %}">
+                            {% if r.is_staff %}JM{% else %}{{ ticket.user.firstname|slice:":1"|upper|default:"?" }}{% endif %}
+                        </div>
+                        <div class="flex-1 {% if r.is_staff %}text-right{% endif %}">
+                            <div class="flex items-baseline gap-2 {% if r.is_staff %}justify-end{% endif %}">
+                                <span class="text-sm font-semibold text-slate-800">{% if r.is_staff %}Support{% if r.author %} · {{ r.author.name }}{% endif %}{% else %}{{ ticket.user.name|default:"Customer" }}{% endif %}</span>
+                                <span class="text-xs text-slate-400">{{ r.created_at|date:"M j, Y H:i" }}</span>
+                            </div>
+                            <div class="mt-1 inline-block text-left rounded-lg px-3 py-2 text-sm whitespace-pre-line {% if r.is_staff %}bg-emerald-50 border border-emerald-200 text-emerald-900{% else %}bg-slate-50 border border-slate-200 text-slate-700{% endif %}">{{ r.message }}</div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+
+                {% if can_manage %}
+                {% if ticket.status == "closed" %}
+                <p class="mt-5 text-sm text-slate-400 border-t border-slate-100 pt-4">This ticket is closed. Reopen it to reply.</p>
+                <form method="post" action="{% url 'webadmin:ticket_status' ticket.id %}" class="mt-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="status" value="in_progress">
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button class="btn-secondary text-xs px-3 py-1.5">Reopen</button>
+                </form>
+                {% else %}
+                <form method="post" action="{% url 'webadmin:ticket_reply' ticket.id %}" class="mt-5 border-t border-slate-100 pt-4">
+                    {% csrf_token %}
+                    <label>Your reply</label>
+                    <textarea name="message" rows="4" required placeholder="Write your reply to {{ ticket.user.firstname|default:'the customer' }}…"></textarea>
+                    <div class="flex flex-wrap items-center gap-2 mt-3">
+                        <select name="status" style="width:200px">
+                            <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>Mark in progress</option>
+                            <option value="resolved">Mark resolved</option>
+                            <option value="open">Leave open</option>
+                        </select>
+                        <button class="btn-primary">Send reply</button>
+                        <span class="text-xs text-slate-400">They'll get a push notification and an email.</span>
+                    </div>
+                </form>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="space-y-5">
+            <div class="card p-6">
+                <h2 class="text-sm font-semibold text-slate-800 mb-3">Customer</h2>
+                {% if ticket.user %}
+                <dl class="space-y-2 text-sm">
+                    <div class="flex justify-between gap-4"><dt class="text-slate-400">Name</dt><dd class="text-slate-800 text-right">{{ ticket.user.name|default:"—" }}</dd></div>
+                    <div class="flex justify-between gap-4"><dt class="text-slate-400">Email</dt><dd class="text-right"><a href="mailto:{{ ticket.user.email }}" class="text-emerald-600 hover:underline break-all">{{ ticket.user.email }}</a></dd></div>
+                    <div class="flex justify-between gap-4"><dt class="text-slate-400">Phone</dt><dd class="text-right">{% if ticket.user.phone_number %}<a href="tel:{{ ticket.user.phone_number }}" class="text-emerald-600 hover:underline">{{ ticket.user.phone_number }}</a>{% else %}<span class="text-slate-400">—</span>{% endif %}</dd></div>
+                    <div class="flex justify-between gap-4"><dt class="text-slate-400">Role</dt><dd class="text-slate-800">{{ ticket.user.role|title }}</dd></div>
+                </dl>
+                {% else %}
+                <p class="text-sm text-slate-400">This account has been deleted, so there is nobody to notify.</p>
+                {% endif %}
+            </div>
+
+            {% if recent_orders %}
+            <div class="card p-6">
+                {% comment %}Most tickets are about an order; without this the
+                   admin has to go hunting in a separate tab.{% endcomment %}
+                <h2 class="text-sm font-semibold text-slate-800 mb-3">Their recent orders</h2>
+                <div class="space-y-2">
+                    {% for o in recent_orders %}
+                    <a href="{% url 'webadmin:order_detail' o.id %}" class="flex items-center justify-between text-sm hover:bg-slate-50 rounded px-2 py-1.5 -mx-2">
+                        <span class="font-mono text-xs text-slate-500">{{ o.reference|truncatechars:22 }}</span>
+                        <span class="text-slate-700">₦{{ o.total }}</span>
+                        <span class="text-xs text-slate-400">{{ o.status|title }}</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if can_manage %}
+            <div class="card p-6">
+                <h2 class="text-sm font-semibold text-slate-800 mb-3">Status</h2>
+                <form method="post" action="{% url 'webadmin:ticket_status' ticket.id %}" class="flex gap-2">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <select name="status" class="flex-1">
+                        {% for key, label in statuses %}
+                        <option value="{{ key }}" {% if ticket.status == key %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn-secondary">Set</button>
+                </form>
+                <p class="text-xs text-slate-400 mt-2">Changing status alone does not notify the customer — only a reply does.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

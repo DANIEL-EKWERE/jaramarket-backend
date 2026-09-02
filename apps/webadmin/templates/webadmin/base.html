@@ -204,8 +204,18 @@ if (localStorage.getItem('sidebarCollapsed') === '1') {
             </a>
             {% endif %}
 
-            {% if request.user|has_perm_slug:"send_notifications" %}
+            {% if request.user|has_any_perm:"view_support,send_notifications" %}
             <p class="nav-section">Engagement</p>
+            {% if request.user|has_perm_slug:"view_support" %}
+            <a href="{% url 'webadmin:tickets_list' %}" class="nav-link {% if 'ticket' in request.resolver_match.url_name %}active{% endif %}">
+                <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 13v5a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h5m5-2h5v5m-9.5 4.5L20 3"/></svg>
+                <span class="nav-text">Support Tickets</span>
+                {% if open_ticket_count %}<span class="ml-auto text-[10px] font-bold bg-amber-500 text-white rounded-full px-1.5 py-0.5">{{ open_ticket_count }}</span>{% endif %}
+            </a>
+            {% endif %}
+            {% endif %}
+
+            {% if request.user|has_perm_slug:"send_notifications" %}
             <a href="{% url 'webadmin:push_broadcast' %}" class="nav-link {% if request.resolver_match.url_name == 'push_broadcast' %}active{% endif %}">
                 <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
                 <span class="nav-text">Send Push</span>

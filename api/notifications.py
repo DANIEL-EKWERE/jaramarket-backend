@@ -173,6 +173,22 @@ def order_item_unavailable_notification(user, order_item):
     return order_items_unavailable_notification(user, order_item.order, [order_item])
 
 
+def ticket_reply_notification(user, ticket, reply_text):
+    """Support answered a ticket -- reach the customer wherever they are."""
+    from .email_templates import ticket_reply_email
+
+    preview = reply_text if len(reply_text) <= 120 else reply_text[:117] + "..."
+    result = notify(user, "TicketReplyNotification", {
+        "type": "ticket_reply", "title": "Support replied",
+        "message": preview, "ticket_id": str(ticket.id),
+        "subject": ticket.subject, "status": ticket.status,
+    }, channels=("database", "fcm"))
+    if user.email:
+        html = ticket_reply_email(user.firstname or user.email, ticket.subject, reply_text)
+        send_email(user.email, f"Re: {ticket.subject}", reply_text, html=html)
+    return result
+
+
 def wallet_notification(user, tx_type, amount, balance, reference, comment):
     from .email_templates import wallet_funded_email, wallet_debit_email, wallet_credit_email
     result = notify(user, "WalletNotification", {
