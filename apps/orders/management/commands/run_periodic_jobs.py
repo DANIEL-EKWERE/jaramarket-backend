@@ -23,6 +23,8 @@ FREQUENT = [
      "Move offers no vendor answered on to the next market"),
     ("escalate_overdue_deliveries",
      "Reclaim items a vendor accepted but never delivered"),
+    ("drop_unreplaced_items",
+     "Refund items the customer never replaced in time"),
 ]
 SLOW = [
     ("reconcile_pending_payments",

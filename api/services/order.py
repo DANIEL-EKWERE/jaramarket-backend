@@ -346,9 +346,15 @@ class OrderService:
         dispatch. The order total moves with it so the books stay straight."""
         from .dispatch import MarketDispatchService
 
+        from .dispatch import replace_window_minutes
+
         item = self._owned_item(user, item_id)
         if item.status != "unavailable":
             raise ValueError("Only an unavailable item can be replaced.")
+        if item.replace_deadline and timezone.now() > item.replace_deadline:
+            raise ValueError(
+                f"The {replace_window_minutes()}-minute window to replace this "
+                f"item has passed — it is being removed and refunded instead.")
 
         replacement = Ingredient.objects.filter(id=ingredient_id, is_active=True).first()
         if not replacement:
@@ -394,6 +400,7 @@ class OrderService:
         item.status = "pending"
         item.re_assigned = False
         item.market = None
+        item.replace_deadline = None   # the swap succeeded; no clock to run
         item.save()
 
         order.total = _d(order.total) + difference
@@ -407,18 +414,27 @@ class OrderService:
 
     @transaction.atomic
     def forgo_item(self, user, item_id):
-        """Drop an unavailable item from the order and refund it.
+        """Customer-initiated drop of an unavailable item."""
+        item = self._owned_item(user, item_id)
+        if item.status != "unavailable":
+            raise ValueError("Only an unavailable item can be dropped.")
+        return self.drop_item(item, automatic=False)
+
+    @transaction.atomic
+    def drop_item(self, item, automatic=False):
+        """Remove an unavailable item from its order and refund it.
 
         The refund is the line amount PLUS any service-fee difference: the fee
         is banded on the subtotal, so removing a line can drop the order into a
         cheaper band and the customer shouldn't keep paying the old one. The
         shipping fee is untouched -- it's still one delivery to one address.
-        """
-        item = self._owned_item(user, item_id)
-        if item.status != "unavailable":
-            raise ValueError("Only an unavailable item can be dropped.")
 
+        `automatic` marks the timeout sweep, which needs different wording:
+        the customer didn't choose this, so the notification has to explain
+        why it happened rather than confirm something they did.
+        """
         order = item.order
+        user = order.user
         siblings = [i for i in order.items.exclude(id=item.id)
                     if i.status != "cancelled"]
         if not siblings:
@@ -441,7 +457,9 @@ class OrderService:
         item.market = None
         item.vendor = None
         item.re_assigned = False
-        item.save(update_fields=["status", "market", "vendor", "re_assigned"])
+        item.replace_deadline = None
+        item.save(update_fields=["status", "market", "vendor", "re_assigned",
+                                 "replace_deadline"])
 
         order.service_charge = new_service_charge
         order.total = (new_subtotal + _d(order.shipping_fee) + _d(order.vat)
@@ -450,7 +468,8 @@ class OrderService:
 
         from ..notifications import order_item_forgone_notification
         try:
-            order_item_forgone_notification(order.user, order, item, refund)
+            order_item_forgone_notification(order.user, order, item, refund,
+                                            automatic=automatic)
         except Exception:  # a notification must never undo a refund
             import logging
             logging.getLogger(__name__).exception(

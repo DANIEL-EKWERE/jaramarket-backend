@@ -54,6 +54,12 @@ def _delivery_timeout_minutes():
     return int(_setting("vendor_delivery_timeout_minutes", 20) or 20)
 
 
+def replace_window_minutes():
+    """How long a customer has to replace an unsourceable item before it is
+    dropped and refunded automatically."""
+    return int(_setting("unavailable_replace_window_minutes", 15) or 15)
+
+
 def haversine_km(lat1, lng1, lat2, lng2):
     lat1, lng1, lat2, lng2 = (math.radians(float(v)) for v in (lat1, lng1, lat2, lng2))
     d_lat, d_lng = lat2 - lat1, lng2 - lng1
@@ -204,11 +210,16 @@ class MarketDispatchService:
         queue (re_assigned=True), but are also flagged `unavailable` so the
         customer is told and offered a replacement instead of the order
         silently hanging with their money already taken."""
+        deadline = timezone.now() + timedelta(minutes=replace_window_minutes())
         for item in items:
             already_flagged = item.status == "unavailable"
             item.re_assigned = True
             item.status = "unavailable"
-            item.save(update_fields=["re_assigned", "status"])
+            # Only start the clock on a NEW failure -- a re-sweep must not
+            # keep pushing the deadline out and leave the item open forever.
+            if not already_flagged or item.replace_deadline is None:
+                item.replace_deadline = deadline
+            item.save(update_fields=["re_assigned", "status", "replace_deadline"])
             # Only a NEW failure is worth telling the customer about --
             # re-running dispatch shouldn't re-notify.
             if not already_flagged and item.order_id and item.order.user_id:

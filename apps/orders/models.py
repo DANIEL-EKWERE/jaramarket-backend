@@ -45,6 +45,10 @@ class OrderItem(TimestampedModel):
                                db_column="market_id", related_name="order_items")
     offer_expires_at = models.DateTimeField(null=True, blank=True)
     delivery_deadline = models.DateTimeField(null=True, blank=True)
+    # How long the customer has to replace an item nobody could source. Past
+    # this the item is dropped and refunded automatically rather than holding
+    # the whole order open indefinitely.
+    replace_deadline = models.DateTimeField(null=True, blank=True)
     assurance_user = models.ForeignKey("accounts.User", on_delete=models.CASCADE, null=True, blank=True,
                                        db_column="assurance_user_id", related_name="qa_order_items")
     assurance_at = models.DateTimeField(null=True, blank=True)

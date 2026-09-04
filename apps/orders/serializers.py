@@ -57,7 +57,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "id", "ingredient_id", "ingredient_name", "product_id", "product_name",
             "quantity", "price", "unit", "amount", "commision", "vendor_amount",
             "status", "vendor_id", "vendor_at", "created_at", "image_url",
-            "is_unavailable", "is_forgone",
+            "is_unavailable", "is_forgone", "replace_deadline",
         ]
 
     def get_is_unavailable(self, obj):

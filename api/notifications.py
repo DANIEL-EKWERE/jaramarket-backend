@@ -168,22 +168,38 @@ def order_items_unavailable_notification(user, order, order_items):
     return result
 
 
-def order_item_forgone_notification(user, order, order_item, refund):
-    """The customer dropped an unavailable item -- confirm the money back."""
+def order_item_forgone_notification(user, order, order_item, refund,
+                                    automatic=False):
+    """An unavailable item left the order and the money went back.
+
+    `automatic` means the replace window ran out rather than the customer
+    choosing -- they need to be told WHY it happened, not congratulated on a
+    decision they didn't make.
+    """
     from .email_templates import order_item_forgone_email
 
     name = _order_item_label(order_item)
-    msg = (f"{name} was removed from order #{order.reference}. "
-           f"₦{refund:,.2f} has been returned to your wallet.")
+    if automatic:
+        title = "Item Removed Automatically"
+        msg = (f"No replacement was chosen in time, so {name} was removed from "
+               f"order #{order.reference}. ₦{refund:,.2f} has been returned to "
+               f"your wallet.")
+    else:
+        title = "Item Removed"
+        msg = (f"{name} was removed from order #{order.reference}. "
+               f"₦{refund:,.2f} has been returned to your wallet.")
+
     result = notify(user, "OrderItemForgoneNotification", {
-        "type": "order_item_forgone", "title": "Item Removed",
+        "type": "order_item_forgone", "title": title,
         "message": msg, "order_id": str(order.id),
         "order_item_id": str(order_item.id),
         "refund": str(refund), "status": "cancelled",
+        "automatic": "1" if automatic else "",
     }, channels=("database", "fcm"))
     if user.email:
         html = order_item_forgone_email(user.firstname or user.email,
-                                        order.reference, name, refund, order.total)
+                                        order.reference, name, refund,
+                                        order.total, automatic=automatic)
         send_email(user.email, f"Item removed from order #{order.reference}",
                    msg, html=html)
     return result

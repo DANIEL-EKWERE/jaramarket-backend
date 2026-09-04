@@ -240,11 +240,17 @@ def ticket_reply_email(firstname, subject, reply_text):
     return _base("Support Replied", body)
 
 
-def order_item_forgone_email(firstname, order_ref, item_name, refund, new_total):
+def order_item_forgone_email(firstname, order_ref, item_name, refund, new_total,
+                             automatic=False):
+    lead = (f"No replacement was chosen in time, so <strong>{item_name}</strong> "
+            f"was removed from your order <strong>#{order_ref}</strong> and "
+            f"refunded."
+            if automatic else
+            f"You removed <strong>{item_name}</strong> from your order "
+            f"<strong>#{order_ref}</strong> because it could not be sourced.")
     body = (
         _h2(f"Hi {firstname},")
-        + _p(f"You removed <strong>{item_name}</strong> from your order "
-             f"<strong>#{order_ref}</strong> because it could not be sourced.")
+        + _p(lead)
         + _table(
             _row("Refunded to Wallet", f"₦{float(refund):,.2f}"),
             _row("New Order Total", f"₦{float(new_total):,.2f}"),
