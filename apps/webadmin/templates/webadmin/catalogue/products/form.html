@@ -134,15 +134,16 @@
                             <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
                         </div>
 
-                        {% comment %}Marks this ingredient as safe to sync. An ingredient
-                           without this hidden field is never touched, so a row the admin
-                           just added can't wipe overrides we never rendered.{% endcomment %}
-                        <input type="hidden" name="ing_state_sync" value="{{ link.ingredient_id }}">
+                        {% comment %}Marks this ingredient as safe to sync, for BOTH state and
+                           LGA overrides. An ingredient without this hidden field is never
+                           touched, so a row the admin just added can't wipe overrides we
+                           never rendered.{% endcomment %}
+                        <input type="hidden" name="ing_price_sync" value="{{ link.ingredient_id }}">
                         <div class="mt-2 pl-1">
                             <button type="button" class="toggle-ing-states text-xs text-emerald-600 hover:underline"
                                     data-target="ing-states-{{ link.ingredient_id }}">
-                                State prices for {{ link.ingredient.name }}
-                                <span class="text-slate-400">({{ link.ingredient.state_prices.all|length }})</span>
+                                Location prices for {{ link.ingredient.name }}
+                                <span class="text-slate-400">({{ link.ingredient.state_prices.all|length }} state, {{ link.ingredient.lga_prices.all|length }} LGA)</span>
                             </button>
                             <div id="ing-states-{{ link.ingredient_id }}" class="ing-state-panel hidden mt-2 bg-white border border-slate-200 rounded-lg p-2">
                                 <p class="text-xs text-amber-600 mb-2">These belong to the ingredient itself — changing them affects every food that uses {{ link.ingredient.name }}, not just this one.</p>
@@ -164,6 +165,33 @@
                                 <p class="ing-state-empty text-xs text-slate-400 mt-1 {% if link.ingredient.state_prices.all %}hidden{% endif %}">No state overrides — ₦{{ link.ingredient.price }} applies everywhere.</p>
                                 <button type="button" class="add-ing-state btn-secondary text-xs px-3 py-1.5 mt-2"
                                         data-ingredient="{{ link.ingredient_id }}">+ Add state</button>
+
+                                <div class="border-t border-slate-100 mt-3 pt-3">
+                                    <p class="text-xs font-semibold text-slate-500 mb-2">LGA prices <span class="font-normal text-slate-400">— take priority over the state price</span></p>
+                                    <div class="ing-lga-rows space-y-2" data-ingredient="{{ link.ingredient_id }}">
+                                        {% for lp in link.ingredient.lga_prices.all %}
+                                        <div class="ing-lga-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+                                            <input type="hidden" name="ing_lga_ingredient" value="{{ link.ingredient_id }}">
+                                            <select name="ing_lga_lga" class="text-xs">
+                                                {% regroup lgas by state as lga_groups_existing %}
+                                                {% for group in lga_groups_existing %}
+                                                <optgroup label="{{ group.grouper.name|default:'Other' }}">
+                                                    {% for l in group.list %}
+                                                    <option value="{{ l.id }}" {% if l.id == lp.lga_id %}selected{% endif %}>{{ l.name }}</option>
+                                                    {% endfor %}
+                                                </optgroup>
+                                                {% endfor %}
+                                            </select>
+                                            <input type="number" step="0.01" name="ing_lga_price" value="{{ lp.price }}" placeholder="Price" class="text-xs">
+                                            <input type="number" step="0.01" name="ing_lga_discount" value="{{ lp.discounted_price|default:'' }}" placeholder="Discount" class="text-xs">
+                                            <button type="button" class="remove-ing-lga btn-danger-soft text-xs px-2 py-1">×</button>
+                                        </div>
+                                        {% endfor %}
+                                    </div>
+                                    <p class="ing-lga-empty text-xs text-slate-400 mt-1 {% if link.ingredient.lga_prices.all %}hidden{% endif %}">No LGA overrides — the state or default price applies.</p>
+                                    <button type="button" class="add-ing-lga btn-secondary text-xs px-3 py-1.5 mt-2"
+                                            data-ingredient="{{ link.ingredient_id }}">+ Add LGA</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -171,6 +199,24 @@
 
                     {% comment %}Row template for a new ingredient state price. The ingredient
                        id is stamped in by JS when the row is added.{% endcomment %}
+                    <template id="ing-lga-row-tpl">
+                        <div class="ing-lga-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
+                            <input type="hidden" name="ing_lga_ingredient" value="">
+                            <select name="ing_lga_lga" class="text-xs">
+                                {% regroup lgas by state as lga_groups_tpl %}
+                                {% for group in lga_groups_tpl %}
+                                <optgroup label="{{ group.grouper.name|default:'Other' }}">
+                                    {% for l in group.list %}
+                                    <option value="{{ l.id }}">{{ l.name }}</option>
+                                    {% endfor %}
+                                </optgroup>
+                                {% endfor %}
+                            </select>
+                            <input type="number" step="0.01" name="ing_lga_price" placeholder="Price" class="text-xs">
+                            <input type="number" step="0.01" name="ing_lga_discount" placeholder="Discount" class="text-xs">
+                            <button type="button" class="remove-ing-lga btn-danger-soft text-xs px-2 py-1">×</button>
+                        </div>
+                    </template>
                     <template id="ing-state-row-tpl">
                         <div class="ing-state-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
                             <input type="hidden" name="ing_state_ingredient" value="">
@@ -429,45 +475,68 @@
         // overrides, so rows are stamped with the ingredient id they belong to
         // -- the server groups on that rather than on DOM order.
         (function () {
-            var tpl = document.getElementById('ing-state-row-tpl');
-            if (!tpl) return;
             var host = document.getElementById('ingredient-rows');
+            if (!host) return;
+
+            // State and LGA rows behave identically, so one handler drives
+            // both off this table rather than two near-copies.
+            var LEVELS = {
+                state: {tpl: 'ing-state-row-tpl', add: 'add-ing-state',
+                        remove: 'remove-ing-state', rows: '.ing-state-rows',
+                        row: '.ing-state-row', empty: '.ing-state-empty',
+                        idField: 'ing_state_ingredient', locField: 'ing_state_state'},
+                lga:   {tpl: 'ing-lga-row-tpl', add: 'add-ing-lga',
+                        remove: 'remove-ing-lga', rows: '.ing-lga-rows',
+                        row: '.ing-lga-row', empty: '.ing-lga-empty',
+                        idField: 'ing_lga_ingredient', locField: 'ing_lga_lga'}
+            };
+
+            function syncEmpty(panel, cfg) {
+                var left = panel.querySelectorAll(cfg.row).length;
+                panel.querySelector(cfg.empty).classList.toggle('hidden', left > 0);
+            }
 
             host.addEventListener('click', function (e) {
                 var toggle = e.target.closest('.toggle-ing-states');
                 if (toggle) {
-                    var panel = document.getElementById(toggle.dataset.target);
-                    if (panel) panel.classList.toggle('hidden');
+                    var target = document.getElementById(toggle.dataset.target);
+                    if (target) target.classList.toggle('hidden');
                     return;
                 }
 
-                var addBtn = e.target.closest('.add-ing-state');
-                if (addBtn) {
-                    var panel = addBtn.closest('.ing-state-panel');
-                    var rows = panel.querySelector('.ing-state-rows');
-                    var clone = tpl.content.cloneNode(true);
-                    clone.querySelector('input[name="ing_state_ingredient"]').value =
-                        addBtn.dataset.ingredient;
-                    // Default to a state not already overridden for this
-                    // ingredient, so a new row isn't born as a duplicate.
-                    var used = Array.prototype.map.call(
-                        rows.querySelectorAll('select[name="ing_state_state"]'),
-                        function (sel) { return sel.value; });
-                    var select = clone.querySelector('select[name="ing_state_state"]');
-                    var free = Array.prototype.find.call(select.options, function (opt) {
-                        return used.indexOf(opt.value) === -1;
-                    });
-                    if (free) select.value = free.value;
-                    rows.appendChild(clone);
-                    panel.querySelector('.ing-state-empty').classList.add('hidden');
-                    return;
-                }
+                for (var key in LEVELS) {
+                    var cfg = LEVELS[key];
+                    var tpl = document.getElementById(cfg.tpl);
+                    if (!tpl) continue;
 
-                if (e.target.classList.contains('remove-ing-state')) {
-                    var panel = e.target.closest('.ing-state-panel');
-                    e.target.closest('.ing-state-row').remove();
-                    var left = panel.querySelectorAll('.ing-state-row').length;
-                    panel.querySelector('.ing-state-empty').classList.toggle('hidden', left > 0);
+                    var addBtn = e.target.closest('.' + cfg.add);
+                    if (addBtn) {
+                        var panel = addBtn.closest('.ing-state-panel');
+                        var rows = panel.querySelector(cfg.rows);
+                        var clone = tpl.content.cloneNode(true);
+                        clone.querySelector('input[name="' + cfg.idField + '"]').value =
+                            addBtn.dataset.ingredient;
+                        // Default to a location not already overridden for this
+                        // ingredient, so a new row isn't born as a duplicate.
+                        var used = Array.prototype.map.call(
+                            rows.querySelectorAll('select[name="' + cfg.locField + '"]'),
+                            function (sel) { return sel.value; });
+                        var select = clone.querySelector('select[name="' + cfg.locField + '"]');
+                        var free = Array.prototype.find.call(select.options, function (opt) {
+                            return used.indexOf(opt.value) === -1;
+                        });
+                        if (free) select.value = free.value;
+                        rows.appendChild(clone);
+                        syncEmpty(panel, cfg);
+                        return;
+                    }
+
+                    if (e.target.classList.contains(cfg.remove)) {
+                        var panel2 = e.target.closest('.ing-state-panel');
+                        e.target.closest(cfg.row).remove();
+                        syncEmpty(panel2, cfg);
+                        return;
+                    }
                 }
             });
         })();

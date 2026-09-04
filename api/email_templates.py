@@ -119,17 +119,27 @@ def otp_email(otp, purpose="verify your email"):
 
 # ── Orders ────────────────────────────────────────────────────────────────────
 
-def order_placed_email(firstname, order_ref, total, items_count):
+def order_placed_email(firstname, order_ref, total, items_count, resume_text=None):
+    """`resume_text` is set when the order arrived after the dispatch cutoff --
+    say when shopping actually starts rather than implying it's underway."""
+    lead = (f"Hi {firstname}, your order has been received."
+            if resume_text else
+            f"Hi {firstname}, your order has been received and is being processed.")
     body = (
         _h2("Order Placed Successfully!")
-        + _p(f"Hi {firstname}, your order has been received and is being processed.")
+        + _p(lead)
         + _table(
             _row("Order Reference", f"#{order_ref}"),
             _row("Total Amount", f"₦{total:,.2f}"),
             _row("Items", str(items_count)),
-            _row("Status", "Pending"),
+            _row("Status", "Scheduled" if resume_text else "Pending"),
         )
-        + _p("You will receive a notification once a vendor picks up your order.")
+        + (_box(_p(f"<strong>Markets are closed right now.</strong> Nothing has "
+                   f"been charged beyond your order total, and shopping begins "
+                   f"<strong>{resume_text}</strong>. We'll let you know the moment "
+                   f"a vendor picks it up."), color="#fff8e7", border="#e6a700")
+           if resume_text else
+           _p("You will receive a notification once a vendor picks up your order."))
     )
     return _base("Order Placed", body)
 

@@ -86,7 +86,7 @@
                                                     <th class="text-left font-medium px-3 py-1.5">Qty</th>
                                                     <th class="text-right font-medium px-3 py-1.5">In this recipe</th>
                                                     <th class="text-right font-medium px-3 py-1.5">Own price</th>
-                                                    <th class="text-right font-medium px-3 py-1.5">State prices</th>
+                                                    <th class="text-right font-medium px-3 py-1.5">Location prices</th>
                                                 </tr>
                                             </thead>
                                             <tbody class="divide-y divide-slate-50">
@@ -97,10 +97,10 @@
                                                     <td class="px-3 py-1.5 text-right font-mono">{% if link.price is not None %}₦{{ link.price }}{% else %}<span class="text-slate-300">—</span>{% endif %}</td>
                                                     <td class="px-3 py-1.5 text-right font-mono text-slate-400">₦{{ link.ingredient.price }}</td>
                                                     <td class="px-3 py-1.5 text-right text-xs">
-                                                        {% with overrides=link.ingredient.state_prices.all %}
-                                                        {% if overrides %}
-                                                        <span class="badge-info" title="{% for o in overrides %}{{ o.state.name }}: ₦{{ o.price }}{% if not forloop.last %} · {% endif %}{% endfor %}">{{ overrides|length }}</span>
-                                                        {% else %}<span class="text-slate-300">none</span>{% endif %}
+                                                        {% with st=link.ingredient.state_prices.all lg=link.ingredient.lga_prices.all %}
+                                                        {% if st %}<span class="badge-info" title="{% for o in st %}{{ o.state.name }}: ₦{{ o.price }}{% if not forloop.last %} · {% endif %}{% endfor %}">{{ st|length }} state</span>{% endif %}
+                                                        {% if lg %}<span class="badge-warning" title="{% for o in lg %}{{ o.lga.name }}: ₦{{ o.price }}{% if not forloop.last %} · {% endif %}{% endfor %}">{{ lg|length }} LGA</span>{% endif %}
+                                                        {% if not st and not lg %}<span class="text-slate-300">none</span>{% endif %}
                                                         {% endwith %}
                                                     </td>
                                                 </tr>

@@ -50,10 +50,15 @@
                             {% for name in order.routed_markets %}
                             <span class="badge-info">{{ name }}</span>
                             {% endfor %}
-                            {% if order.unrouted_count %}
+                            {% comment %}"Awaiting dispatch" reads as a fault; when the
+                               order simply arrived after the 18:00 cutoff, say that
+                               instead so nobody goes looking for a bug.{% endcomment %}
+                            {% if order.scheduled_dispatch_at %}
+                            <span class="badge-warning" title="Placed after the dispatch cutoff — resumes {{ order.scheduled_dispatch_at }}">Paused until {{ order.scheduled_dispatch_at|date:"M j, H:i" }}</span>
+                            {% elif order.unrouted_count %}
                             <span class="badge-warning" title="Items not yet offered to any market">{{ order.unrouted_count }} awaiting dispatch</span>
                             {% endif %}
-                            {% if not order.routed_markets and not order.unrouted_count %}
+                            {% if not order.routed_markets and not order.unrouted_count and not order.scheduled_dispatch_at %}
                             <span class="text-slate-400">—</span>
                             {% endif %}
                         </td>

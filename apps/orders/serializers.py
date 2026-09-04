@@ -83,6 +83,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "id", "reference", "order_date", "delivery_type", "shipping_fee",
             "service_charge", "vat", "total", "remarks", "meal_prep", "audio",
             "status", "address_id", "created_at", "items", "progress",
+            "scheduled_dispatch_at",
         ]
 
     def get_audio(self, obj):
@@ -99,6 +100,10 @@ class OrderSerializer(serializers.ModelSerializer):
         """
         STAGES = ["placed", "shopping", "vendor_delivered", "admin_approved",
                   "logistics", "delivered"]
+        # An order taken after the dispatch cutoff sits at "placed" until
+        # markets reopen. Without saying so, that looks identical to an order
+        # nobody has picked up.
+        scheduled_for = obj.scheduled_dispatch_at
         items = list(obj.items.all())
         total = len(items)
         # 'completed' means QA passed; those items are shopped and delivered too.
@@ -137,4 +142,8 @@ class OrderSerializer(serializers.ModelSerializer):
             # Drives the customer's "Mark as Received" button: only once
             # admin approval has released the order to logistics.
             "can_mark_received": obj.status in ("completed", "in_transit"),
+            # Paused until markets reopen -- the app shows this instead of a
+            # stalled "Placed" step with no explanation.
+            "is_scheduled": bool(scheduled_for) and obj.status == "pending",
+            "resumes_at": scheduled_for,
         }

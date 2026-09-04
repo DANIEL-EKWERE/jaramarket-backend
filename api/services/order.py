@@ -240,19 +240,23 @@ class OrderService:
         wallet = Wallet.objects.filter(user=user).first()
         wallet_notification(user, "debit", total, wallet.balance if wallet else 0,
                             order.reference, f"Payment for Order #{order.reference}")
-        order_placed_notification(user, order)
 
-        # Route each item to the closest market that can fulfil it, and
-        # offer it to the eligible vendors stationed there -- unless the
-        # order landed outside the dispatch window (default 09:00-18:30),
-        # in which case dispatch is deferred until it reopens.
+        # Whether the order is paused has to be settled BEFORE the customer is
+        # told it was placed -- otherwise they get "placed successfully" and
+        # then watch nothing happen until morning with no explanation.
         from .dispatch import MarketDispatchService, next_dispatch_time
         dispatch_at = next_dispatch_time()
-        if dispatch_at is None:
-            MarketDispatchService().resolve(list(order.items.filter(ingredient__isnull=False)), address)
-        else:
+        if dispatch_at is not None:
             order.scheduled_dispatch_at = dispatch_at
             order.save(update_fields=["scheduled_dispatch_at"])
+
+        order_placed_notification(user, order)
+
+        # Route each item to the closest market that can fulfil it, and offer
+        # it to the eligible vendors stationed there -- unless the order landed
+        # outside the dispatch window (09:00-18:00), in which case it waits.
+        if dispatch_at is None:
+            MarketDispatchService().resolve(list(order.items.filter(ingredient__isnull=False)), address)
         return order
 
     def _get_bonuses(self, price, quantity, order, user):

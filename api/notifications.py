@@ -269,16 +269,43 @@ def welcome_notification(user):
 
 
 def order_placed_notification(user, order):
+    """Confirm the order -- and say so plainly when it won't start tonight.
+
+    Orders taken after the dispatch cutoff sit until markets reopen. Saying
+    only "placed successfully" leaves the customer watching an order that
+    never moves, with no idea why.
+    """
+    from django.utils import timezone
     from .email_templates import order_placed_email
+
     items_count = order.items.count()
-    msg = f"Your order #{order.reference} has been placed successfully."
+    resumes_at = order.scheduled_dispatch_at
+    if resumes_at:
+        local = timezone.localtime(resumes_at)
+        today = timezone.localtime(timezone.now()).date()
+        when = "today" if local.date() == today else (
+            "tomorrow" if (local.date() - today).days == 1
+            else local.strftime("on %A"))
+        resume_text = f"{when} at {local.strftime('%-I:%M %p').lower()}"
+        msg = (f"Your order #{order.reference} has been placed. Markets are "
+               f"closed now, so shopping starts {resume_text}.")
+        title = "Order Placed — starts " + when
+    else:
+        msg = f"Your order #{order.reference} has been placed successfully."
+        title = "Order Placed"
+        resume_text = None
+
     notify(user, "OrderPlacedNotification", {
-        "type": "order_placed", "title": "Order Placed",
+        "type": "order_placed", "title": title,
         "message": msg, "order_id": str(order.id), "status": "pending",
+        "scheduled": "1" if resumes_at else "",
     }, channels=("database", "fcm"))
     html = order_placed_email(user.firstname or user.email, order.reference,
-                              float(order.total), items_count)
-    send_email(user.email, f"Order #{order.reference} Placed Successfully", msg, html=html)
+                              float(order.total), items_count,
+                              resume_text=resume_text)
+    subject = (f"Order #{order.reference} Placed — shopping starts {resume_text}"
+               if resume_text else f"Order #{order.reference} Placed Successfully")
+    send_email(user.email, subject, msg, html=html)
 
 
 class FirebasePush:

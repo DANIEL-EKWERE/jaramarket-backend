@@ -19,18 +19,21 @@ from ._base import _setting
 
 
 def _dispatch_cutoff_time():
-    return datetime.strptime(_setting("order_dispatch_cutoff_time", "18:30") or "18:30", "%H:%M").time()
+    # 18:00 -- markets have closed, so an order taken after this can't be
+    # shopped until they reopen. Override with the order_dispatch_cutoff_time
+    # setting.
+    return datetime.strptime(_setting("order_dispatch_cutoff_time", "18:00") or "18:00", "%H:%M").time()
 
 
 def _dispatch_resume_time():
-    return datetime.strptime(_setting("order_dispatch_resume_time", "09:00") or "09:00", "%H:%M").time()
+    return datetime.strptime(_setting("order_dispatch_resume_time", "07:30") or "07:30", "%H:%M").time()
 
 
 def next_dispatch_time(now=None):
     """None if `now` falls inside the dispatch window (dispatch immediately);
     otherwise the next datetime dispatch resumes at (defer until then) --
-    orders placed at/after the cutoff (18:30 by default) wait until the
-    resume time (09:00) the same or next day."""
+    orders placed at/after the cutoff (18:00 by default) wait until the
+    resume time (07:30) the same or next day."""
     now = now or timezone.localtime(timezone.now())
     cutoff, resume = _dispatch_cutoff_time(), _dispatch_resume_time()
     if resume <= now.time() < cutoff:

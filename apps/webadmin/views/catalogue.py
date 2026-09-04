@@ -102,25 +102,26 @@ def _sync_ingredient_links(product, rows):
     return incoming
 
 
-def _extract_ingredient_state_rows(request):
-    """State-price rows for the ingredients shown on the product form.
+def _extract_ingredient_price_rows(request, level):
+    """State- or LGA-price rows for the ingredients shown on the product form.
 
     Nested repeating groups don't fit the flat getlist() pattern on their own,
-    so every row carries its own ingredient id alongside the state and price.
+    so every row carries its own ingredient id alongside the location and
+    price. `level` is "state" or "lga".
     """
     return list(zip(
-        request.POST.getlist("ing_state_ingredient"),
-        request.POST.getlist("ing_state_state"),
-        request.POST.getlist("ing_state_price"),
-        request.POST.getlist("ing_state_discount"),
+        request.POST.getlist(f"ing_{level}_ingredient"),
+        request.POST.getlist(f"ing_{level}_{level}"),
+        request.POST.getlist(f"ing_{level}_price"),
+        request.POST.getlist(f"ing_{level}_discount"),
     ))
 
 
-def _sync_ingredient_state_prices(request, rows):
-    """Replace state overrides for ONLY the ingredients this form rendered.
+def _sync_ingredient_price_overrides(request, level, rows):
+    """Replace location overrides for ONLY the ingredients this form rendered.
 
     The form posts every existing override as a (possibly hidden) row, so an
-    untouched save round-trips unchanged. The `ing_state_sync` list is what
+    untouched save round-trips unchanged. The `ing_price_sync` list is what
     makes deletion safe: an ingredient whose panel was never rendered -- a row
     the admin just added, say -- is absent from it and so is left completely
     alone, instead of having its real overrides wiped by an empty set.
@@ -128,30 +129,31 @@ def _sync_ingredient_state_prices(request, rows):
     These prices belong to the ingredient itself, not to this recipe, so the
     change is global. The form says so.
     """
-    from apps.catalogue.models import IngredientStatePrice
+    model = {"state": IngredientStatePrice, "lga": IngredientLgaPrice}[level]
+    fk = f"{level}_id"
 
-    syncable = {int(i) for i in request.POST.getlist("ing_state_sync") if i}
+    syncable = {int(i) for i in request.POST.getlist("ing_price_sync") if i}
     if not syncable:
         return 0
 
     grouped = {}
-    for ing_id, state_id, price, discount in rows:
-        if not ing_id or not state_id or price in (None, ""):
+    for ing_id, loc_id, price, discount in rows:
+        if not ing_id or not loc_id or price in (None, ""):
             continue
         ing_id = int(ing_id)
         if ing_id not in syncable:
             continue
-        grouped.setdefault(ing_id, {})[int(state_id)] = {
+        grouped.setdefault(ing_id, {})[int(loc_id)] = {
             "price": price, "discounted_price": discount or None}
 
     touched = 0
     for ing_id in syncable:
         incoming = grouped.get(ing_id, {})
-        existing = IngredientStatePrice.objects.filter(ingredient_id=ing_id)
-        touched += existing.exclude(state_id__in=incoming.keys()).delete()[0]
-        for state_id, data in incoming.items():
-            _, created = IngredientStatePrice.objects.update_or_create(
-                ingredient_id=ing_id, state_id=state_id, defaults=data)
+        existing = model.objects.filter(ingredient_id=ing_id)
+        touched += existing.exclude(**{f"{fk}__in": incoming.keys()}).delete()[0]
+        for loc_id, data in incoming.items():
+            model.objects.update_or_create(
+                ingredient_id=ing_id, **{fk: loc_id}, defaults=data)
             touched += 1
     return touched
 
@@ -273,6 +275,7 @@ def products_list_view(request):
     qs = qs.distinct().prefetch_related(
         "ingredientproduct_set__ingredient",
         "ingredientproduct_set__ingredient__state_prices__state",
+        "ingredientproduct_set__ingredient__lga_prices__lga",
         "state_prices__state")
     paginator = Paginator(qs, request.GET.get("per_page", 20))
     page = paginator.get_page(request.GET.get("page"))
@@ -367,7 +370,9 @@ def product_update_view(request, id):
         if linked_ingredients:
             p.price = _ingredient_rows_total(linked_ingredients)
             p.save(update_fields=["price"])
-        _sync_ingredient_state_prices(request, _extract_ingredient_state_rows(request))
+        for _level in ("state", "lga"):
+            _sync_ingredient_price_overrides(
+                request, _level, _extract_ingredient_price_rows(request, _level))
         messages.success(request, "Product updated successfully.")
         return redirect("webadmin:products_list")
     return render(request, "webadmin/catalogue/products/form.html", {
@@ -379,7 +384,9 @@ def product_update_view(request, id):
         "markets": Market.objects.filter(is_active=True).select_related("state", "lga").order_by("name"),
         "suspensions": _suspension_rows(p.state_suspensions, p.lga_suspensions, p.market_suspensions),
         "ingredients": Ingredient.objects.order_by("name"),
-        "ingredient_links": p.ingredientproduct_set.select_related("ingredient").all(),
+        "ingredient_links": p.ingredientproduct_set.select_related("ingredient")
+                             .prefetch_related("ingredient__state_prices__state",
+                                               "ingredient__lga_prices__lga").all(),
         "uoms": Uom.objects.order_by("name")})
 
 
