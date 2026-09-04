@@ -3,7 +3,12 @@ from django.conf import settings
 
 BRAND_COLOR = "#2E7D32"
 BRAND_NAME = "Jaramarket"
-LOGO_URL = f"{settings.APP_URL}/static/email/jaramarket_logo.png"
+# The email logo is a FLATTENED copy with a white plate baked in, not the
+# transparent brand PNG. The wordmark is dark grey, so on a transparent
+# background a dark-mode client darkens the header behind it and "Jara"
+# disappears -- leaving only the orange "Market". Clients override CSS
+# backgrounds; they can't override pixels.
+LOGO_URL = f"{settings.APP_URL}/static/email/jaramarket_logo_email.png"
 
 
 def _base(title, content_html):
@@ -12,7 +17,14 @@ def _base(title, content_html):
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="color-scheme" content="light"/>
+<meta name="supported-color-schemes" content="light"/>
 <title>{title}</title>
+<style>
+  /* Apple Mail and Outlook honour this and leave the light design alone.
+     Gmail ignores it, which is why the logo carries its own white plate. */
+  :root {{ color-scheme: light; supported-color-schemes: light; }}
+</style>
 </head>
 <body style="margin:0;padding:0;background:#f4f4f4;font-family:Arial,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f4;padding:30px 0;">
@@ -21,7 +33,8 @@ def _base(title, content_html):
       <!-- Header -->
       <tr>
         <td style="background:#ffffff;padding:24px 32px 16px;text-align:center;border-bottom:3px solid {BRAND_COLOR};">
-          <img src="{LOGO_URL}" alt="{BRAND_NAME}" width="140" style="display:block;margin:0 auto;max-width:140px;height:auto;"/>
+          <img src="{LOGO_URL}" alt="{BRAND_NAME}" width="150"
+               style="display:block;margin:0 auto;max-width:150px;height:auto;background:#ffffff;"/>
         </td>
       </tr>
       <!-- Body -->
@@ -225,6 +238,21 @@ def ticket_reply_email(firstname, subject, reply_text):
              "and we'll pick it up from there.")
     )
     return _base("Support Replied", body)
+
+
+def order_item_forgone_email(firstname, order_ref, item_name, refund, new_total):
+    body = (
+        _h2(f"Hi {firstname},")
+        + _p(f"You removed <strong>{item_name}</strong> from your order "
+             f"<strong>#{order_ref}</strong> because it could not be sourced.")
+        + _table(
+            _row("Refunded to Wallet", f"₦{float(refund):,.2f}"),
+            _row("New Order Total", f"₦{float(new_total):,.2f}"),
+        )
+        + _p("The rest of your order continues as normal — we'll keep you posted "
+             "as vendors pick up the remaining items.")
+    )
+    return _base("Item Removed", body)
 
 
 def new_order_vendor_email(vendor_name, order_ref, items_count):

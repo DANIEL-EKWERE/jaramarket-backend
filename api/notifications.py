@@ -168,6 +168,27 @@ def order_items_unavailable_notification(user, order, order_items):
     return result
 
 
+def order_item_forgone_notification(user, order, order_item, refund):
+    """The customer dropped an unavailable item -- confirm the money back."""
+    from .email_templates import order_item_forgone_email
+
+    name = _order_item_label(order_item)
+    msg = (f"{name} was removed from order #{order.reference}. "
+           f"₦{refund:,.2f} has been returned to your wallet.")
+    result = notify(user, "OrderItemForgoneNotification", {
+        "type": "order_item_forgone", "title": "Item Removed",
+        "message": msg, "order_id": str(order.id),
+        "order_item_id": str(order_item.id),
+        "refund": str(refund), "status": "cancelled",
+    }, channels=("database", "fcm"))
+    if user.email:
+        html = order_item_forgone_email(user.firstname or user.email,
+                                        order.reference, name, refund, order.total)
+        send_email(user.email, f"Item removed from order #{order.reference}",
+                   msg, html=html)
+    return result
+
+
 def order_item_unavailable_notification(user, order_item):
     """Single-item convenience wrapper."""
     return order_items_unavailable_notification(user, order_item.order, [order_item])

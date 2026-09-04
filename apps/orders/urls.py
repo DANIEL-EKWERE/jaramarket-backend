@@ -10,6 +10,7 @@ urlpatterns = [
     path("orders/<int:order>/reorder", v.order_reorder),
     path("orders/items/<int:item_id>/replacements", v.order_item_replacements),
     path("orders/items/<int:item_id>/replace", v.order_item_replace),
+    path("orders/items/<int:item_id>/forgo", v.order_item_forgo),
     path("vendor/dashboard", v.vendor_dashboard),
     path("vendor/orders", v.vendor_available_orders),
     path("vendor/orders/accepted", v.vendor_my_orders),

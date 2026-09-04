@@ -405,6 +405,61 @@ class OrderService:
         item.refresh_from_db()
         return item, difference
 
+    @transaction.atomic
+    def forgo_item(self, user, item_id):
+        """Drop an unavailable item from the order and refund it.
+
+        The refund is the line amount PLUS any service-fee difference: the fee
+        is banded on the subtotal, so removing a line can drop the order into a
+        cheaper band and the customer shouldn't keep paying the old one. The
+        shipping fee is untouched -- it's still one delivery to one address.
+        """
+        item = self._owned_item(user, item_id)
+        if item.status != "unavailable":
+            raise ValueError("Only an unavailable item can be dropped.")
+
+        order = item.order
+        siblings = [i for i in order.items.exclude(id=item.id)
+                    if i.status != "cancelled"]
+        if not siblings:
+            raise ValueError(
+                "This is the only item left — cancel the whole order instead.")
+
+        old_service_charge = _d(order.service_charge)
+        new_subtotal = sum((_d(i.amount) for i in siblings), Decimal("0"))
+        new_service_charge = calculate_service_fee(new_subtotal)
+        # Guard against a mis-seeded tier table refunding a fee increase.
+        fee_refund = max(old_service_charge - new_service_charge, Decimal("0"))
+        refund = _d(item.amount) + fee_refund
+
+        if refund > 0:
+            TransactionLogService.credit(
+                user.id, USER_TYPE, refund, order.id, ORDER_TYPE, "NGN",
+                f"Refund for dropped item in Order #{order.reference}")
+
+        item.status = "cancelled"
+        item.market = None
+        item.vendor = None
+        item.re_assigned = False
+        item.save(update_fields=["status", "market", "vendor", "re_assigned"])
+
+        order.service_charge = new_service_charge
+        order.total = (new_subtotal + _d(order.shipping_fee) + _d(order.vat)
+                       + new_service_charge)
+        order.save(update_fields=["service_charge", "total"])
+
+        from ..notifications import order_item_forgone_notification
+        try:
+            order_item_forgone_notification(order.user, order, item, refund)
+        except Exception:  # a notification must never undo a refund
+            import logging
+            logging.getLogger(__name__).exception(
+                "Item %s dropped but the customer was not notified", item.id)
+
+        order.refresh_from_db()
+        item.refresh_from_db()
+        return item, refund, order
+
     def _owned_item(self, user, item_id):
         item = OrderItem.objects.select_related("order", "ingredient", "product").filter(id=item_id).first()
         if not item:
@@ -651,8 +706,11 @@ class OrderService:
                 f"approved again (vendors would be paid twice).")
         order.status = "completed"
         order.save(update_fields=["status"])
-        order.items.all().update(status="completed", assurance_user=qa_user,
-                                 assurance_at=timezone.now(), pass_quality_assurance=True)
+        # Items the customer dropped were refunded and are out of the order --
+        # sweeping them into "completed" would resurrect them on the receipt.
+        order.items.exclude(status="cancelled").update(
+            status="completed", assurance_user=qa_user,
+            assurance_at=timezone.now(), pass_quality_assurance=True)
         from ..notifications import order_status_notification
         order_status_notification(order.user, order, "completed")
 
@@ -661,6 +719,7 @@ class OrderService:
         from apps.finance.models import Wallet as _Wallet
 
         vendor_credits = (order.items.filter(vendor__isnull=False)
+                          .exclude(status="cancelled")
                           .values("vendor_id").annotate(total=Sum("vendor_amount")))
         for row in vendor_credits:
             if _d(row["total"]) <= 0:

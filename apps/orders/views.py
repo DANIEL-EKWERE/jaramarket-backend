@@ -148,6 +148,19 @@ def order_item_replace(request, item_id):
 
 
 @api_view(["POST"])
+def order_item_forgo(request, item_id):
+    """Drop an unavailable item and refund it."""
+    try:
+        item, refund, order = _svc.forgo_item(request.user, item_id)
+    except ValueError as e:
+        return error(str(e), status=422)
+    return success(f"Item removed — ₦{refund:,.2f} refunded to your wallet.", {
+        "order": OrderSerializer(order).data,
+        "refund": str(refund),
+    })
+
+
+@api_view(["POST"])
 def order_mark_received(request, order):
     """Customer confirms the order actually reached them — the final step
     after admin approval has paid vendors and released it to logistics."""

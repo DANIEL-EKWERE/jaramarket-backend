@@ -49,6 +49,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     image_url = serializers.SerializerMethodField()
     is_unavailable = serializers.SerializerMethodField()
+    is_forgone = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
@@ -56,11 +57,16 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "id", "ingredient_id", "ingredient_name", "product_id", "product_name",
             "quantity", "price", "unit", "amount", "commision", "vendor_amount",
             "status", "vendor_id", "vendor_at", "created_at", "image_url",
-            "is_unavailable",
+            "is_unavailable", "is_forgone",
         ]
 
     def get_is_unavailable(self, obj):
         return obj.status == "unavailable"
+
+    def get_is_forgone(self, obj):
+        """Dropped by the customer and refunded -- shown struck through rather
+        than hidden, so the order history still explains the price change."""
+        return obj.status == "cancelled"
 
     def get_image_url(self, obj):
         """A food order's line item is an ingredient, with the dish kept on
@@ -104,7 +110,9 @@ class OrderSerializer(serializers.ModelSerializer):
         # markets reopen. Without saying so, that looks identical to an order
         # nobody has picked up.
         scheduled_for = obj.scheduled_dispatch_at
-        items = list(obj.items.all())
+        # A dropped item is refunded and out of the order -- counting it would
+        # leave "remaining" permanently above zero and the order never done.
+        items = [i for i in obj.items.all() if i.status != "cancelled"]
         total = len(items)
         # 'completed' means QA passed; those items are shopped and delivered too.
         accepted = sum(1 for i in items if i.status in ("processing", "delivered", "completed"))
