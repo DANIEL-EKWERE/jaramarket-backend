@@ -10,3 +10,5 @@ venv/
 *.json
 jaramarket-*.json
 .env
+# Cron output — runtime noise, not source
+logs/

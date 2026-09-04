@@ -1,5 +1,5 @@
 """Dispatch orders that were deferred because they were placed outside the
-09:00-18:30 dispatch window (see MarketDispatchService.next_dispatch_time,
+09:00-18:00 dispatch window (see MarketDispatchService.next_dispatch_time,
 called from OrderService.create_order). Same precedent as
 escalate_stale_offers.py -- a plain management command meant to be triggered
 by an external scheduler (e.g. a Render Cron Job), since this project has no
