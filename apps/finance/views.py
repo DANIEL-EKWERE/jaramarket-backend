@@ -180,12 +180,15 @@ def transfers_index(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def delivery_fee(request):
     """Delivery fee for a location, so the app can show it before checkout.
 
     Accepts ?state_id=&lga_id=, or ?address_id= to read them off one of the
     caller's saved addresses. Falls back to the caller's default address so
-    the cart can show a fee before any address is picked.
+    the cart can show a fee before any address is picked. Guests (browsing
+    without an account) have no saved addresses, so they get the fee for the
+    location they pass, or the default fee.
     """
     from api.services.order import resolve_delivery_fee
     from apps.customers.models import Address
@@ -193,7 +196,7 @@ def delivery_fee(request):
     state_id = request.query_params.get("state_id")
     lga_id = request.query_params.get("lga_id")
 
-    if not state_id and not lga_id:
+    if not state_id and not lga_id and request.user.is_authenticated:
         addresses = Address.objects.filter(user=request.user)
         address_id = request.query_params.get("address_id")
         address = (addresses.filter(id=address_id).first() if address_id

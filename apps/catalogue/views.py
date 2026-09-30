@@ -171,6 +171,7 @@ def categories_all_products(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def categories_limit_products(request):
     limit = int(request.query_params.get("limit", 5))
     cats = list(Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID).order_by("sort_by"))
@@ -235,6 +236,7 @@ def _price_in_range(price, min_price, max_price):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def fetch_ingredients(request):
     qs = Ingredient.objects.filter(is_active=True).order_by("name")
     search = request.query_params.get("search")
@@ -248,6 +250,7 @@ def fetch_ingredients(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def fetch_product(request):
     qs = Product.objects.filter(is_active=True)
     search = request.query_params.get("search")
@@ -261,11 +264,13 @@ def fetch_product(request):
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def fetch_uom(request):
     return success("UOMs retrieved", UomSerializer(Uom.objects.all(), many=True).data)
 
 
 @api_view(["GET"])
+@permission_classes([AllowAny])
 def get_product_by_id(request, id):
     obj = Product.objects.filter(id=id, is_active=True).first()
     if obj and obj.is_suspended_in(request.query_params.get("state_id"), request.query_params.get("lga_id"),
