@@ -22,6 +22,7 @@ urlpatterns = [
     path("update-profile", v.edit_profile),
     path("user/change-password", v.change_password),
     path("my-referrals", v.my_referrals),
+    path("delete-account", v.delete_account),
     path("fcm-token", v.fcm_token),
     path("api/notifications/token", v.fcm_token),  # vendor app alias
     # PIN

@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.contrib.auth.hashers import check_password, make_password
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -140,6 +141,58 @@ def reset_password(request):
     except ValueError as e:
         return error(str(e), status=400)
     return success("Password reset successful", UserSerializer(user).data)
+
+
+# Orders a vendor/rider is still working on -- they need the customer's
+# name, phone and delivery address until it is delivered or cancelled.
+OPEN_ORDER_STATUSES = ("pending", "processing", "in_transit")
+
+
+@api_view(["POST", "DELETE"])
+def delete_account(request):
+    """Permanently delete the caller's customer account (App Store 5.1.1(v)).
+
+    Personal data is erased: profile, credentials, PIN, device token, bank
+    details, addresses, cart, favorites and support tickets. Orders, payments
+    and wallet/transaction rows stay, attached to the scrubbed user, because
+    vendors and finance still have to account for them. The row can never be
+    signed into again, and the email is freed so the person can sign up afresh.
+    """
+    from apps.support.models import HelpTicket, Support
+
+    user = request.user
+    if not user.is_customer():
+        return error("Only customer accounts can be deleted from the app.", status=403)
+    if user.orders.filter(status__in=OPEN_ORDER_STATUSES).exists():
+        return error("You have an order in progress. You can delete your account "
+                     "once it has been delivered or cancelled.", status=422)
+
+    with transaction.atomic():
+        # Addresses on past orders can't be removed (the order points at
+        # them), so those are blanked; unused ones are deleted outright.
+        user.addresses.filter(order__isnull=True).delete()
+        user.addresses.update(contact_address=None, phone_number=None,
+                              latitude=None, longitude=None, is_default=False)
+        user.carts.all().delete()
+        user.favorites.all().delete()
+        Support.objects.filter(user=user).delete()
+        HelpTicket.objects.filter(user=user).delete()
+
+        user.firstname = "Deleted"
+        user.lastname = "User"
+        user.email = f"deleted-{user.id}-{int(timezone.now().timestamp())}@deleted.invalid"
+        for field in ("phone_number", "profile_picture", "referral_code", "pin",
+                      "fcm_token", "business_name", "business_address", "bank_name",
+                      "bank_code", "recipient_code", "account_number", "account_name",
+                      "latitude", "longitude"):
+            setattr(user, field, None)
+        user.set_unusable_password()
+        # is_active=False also makes simplejwt reject any token already issued.
+        user.is_active = False
+        user.deleted_at = timezone.now()
+        user.save()
+
+    return success("Your account has been deleted.")
 
 
 @api_view(["GET"])
