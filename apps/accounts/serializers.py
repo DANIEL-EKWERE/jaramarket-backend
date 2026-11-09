@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import Roles, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -32,7 +32,7 @@ class RegisterSerializer(serializers.Serializer):
     phone_number = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, min_length=8)
     referral_code = serializers.CharField(required=False, allow_blank=True)
-    role = serializers.CharField(required=False)
+    role = serializers.ChoiceField(choices=Roles.SELF_SIGNUP_ROLES, required=False)
     country_id = serializers.IntegerField(required=False)
 
 

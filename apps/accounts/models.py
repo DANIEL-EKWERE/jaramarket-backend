@@ -4,6 +4,9 @@ from django.db import models
 from api.base import AllObjectsManager, TimestampedModel
 
 
+SUSPENDED_ACCOUNT_MESSAGE = "This account has been suspended. Please contact support."
+
+
 class Roles:
     ADMIN = "admin"; SUPER_ADMIN = "super_admin"; STATE_ADMIN = "state_admin"
     VENDOR_MANAGER = "vendor_manager"; ACCOUNTS = "accounts"; AUDIT = "audit"
@@ -17,6 +20,9 @@ class Roles:
         (QA, "Quality Assurance"), (ACCOUNT, "Account"),
         (STATE_REPRESENTATIVE, "State Representative"),
     ]
+    # The only roles a person may choose for themselves when signing up. Every
+    # other role is staff, and is only ever granted from the admin dashboard.
+    SELF_SIGNUP_ROLES = [CUSTOMER, VENDOR]
     ADMIN_ROLES = [SUPER_ADMIN, ADMIN, STATE_ADMIN, VENDOR_MANAGER, ACCOUNTS, AUDIT, LOGISTICS,
                    STATE_REPRESENTATIVE]
 
@@ -171,6 +177,20 @@ class User(AbstractBaseUser, PermissionsMixin):
     def is_logistics(self):      return self.role == Roles.LOGISTICS
     def is_vendor(self):         return self.role == Roles.VENDOR
     def is_customer(self):       return self.role == Roles.CUSTOMER
+
+    def is_suspended(self):
+        """Switched off by an admin. Self-signup accounts only start inactive
+        until the email is verified, so inactive *after* verification can only
+        mean someone turned it off -- and no sign-in route may undo that."""
+        return not self.is_active and self.email_verified_at is not None
+
+    def sign_in_blocker(self):
+        """Why this account may not sign in by any route, or None."""
+        if self.deleted_at:
+            return "This account has been deleted."
+        if self.is_suspended():
+            return SUSPENDED_ACCOUNT_MESSAGE
+        return None
 
     def is_state_representative(self): return self.role == Roles.STATE_REPRESENTATIVE
 

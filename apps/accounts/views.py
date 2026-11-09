@@ -7,6 +7,7 @@ from rest_framework.permissions import AllowAny
 
 from api.utils import error, success
 from api.services import LoginService, UserRegistrationService
+from api.services._base import USER_TYPE
 from .models import Roles, User
 from .serializers import (
     ChangePasswordSerializer, LoginSerializer, OtpSerializer,
@@ -147,10 +148,35 @@ def reset_password(request):
 # name, phone and delivery address until it is delivered or cancelled.
 OPEN_ORDER_STATUSES = ("pending", "processing", "in_transit")
 
+# A vendor's item with money or work outstanding: "delivered" items are only
+# paid out once QA completes the order.
+VENDOR_OPEN_ITEM_STATUSES = ("processing", "delivered")
+
+# A transfer in any other state can still fail, which refunds the wallet.
+FINISHED_TRANSFER_STATUSES = ("success", "failed", "reversed")
+
+
+def _vendor_deletion_blocker(user):
+    """Why this vendor can't be deleted yet, or None. Earnings are never
+    forfeited: everything owed to them has to be paid out first."""
+    from apps.finance.models import Transfer, Wallet
+    from apps.orders.models import OrderItem
+
+    if OrderItem.objects.filter(vendor=user, status__in=VENDOR_OPEN_ITEM_STATUSES).exists():
+        return ("You have orders in progress or awaiting payout. You can delete "
+                "your account once they have been completed.")
+    if Wallet.objects.filter(user=user, balance__gt=0).exists():
+        return "Please withdraw your wallet balance before deleting your account."
+    if Transfer.objects.filter(owner_type=USER_TYPE, owner_id=user.id).exclude(
+            status__in=FINISHED_TRANSFER_STATUSES).exists():
+        return ("You have a withdrawal still processing. You can delete your "
+                "account once it has finished.")
+    return None
+
 
 @api_view(["POST", "DELETE"])
 def delete_account(request):
-    """Permanently delete the caller's customer account (App Store 5.1.1(v)).
+    """Permanently delete the caller's customer or vendor account (App Store 5.1.1(v)).
 
     Personal data is erased: profile, credentials, PIN, device token, bank
     details, addresses, cart, favorites and support tickets. Orders, payments
@@ -158,11 +184,18 @@ def delete_account(request):
     vendors and finance still have to account for them. The row can never be
     signed into again, and the email is freed so the person can sign up afresh.
     """
+    from apps.finance.models import BankAccount
+    from apps.orders.models import MarketOfferResponse
     from apps.support.models import HelpTicket, Support
+    from apps.vendors.models import Vendor
 
     user = request.user
-    if not user.is_customer():
-        return error("Only customer accounts can be deleted from the app.", status=403)
+    if not (user.is_customer() or user.is_vendor()):
+        return error("Staff accounts can't be deleted from the app.", status=403)
+    if user.is_vendor():
+        blocker = _vendor_deletion_blocker(user)
+        if blocker:
+            return error(blocker, status=422)
     if user.orders.filter(status__in=OPEN_ORDER_STATUSES).exists():
         return error("You have an order in progress. You can delete your account "
                      "once it has been delivered or cancelled.", status=422)
@@ -178,11 +211,21 @@ def delete_account(request):
         Support.objects.filter(user=user).delete()
         HelpTicket.objects.filter(user=user).delete()
 
+        if user.is_vendor():
+            user.categories.clear()
+            Vendor.objects.filter(user=user).update(is_active=False, market=None)
+            BankAccount.objects.filter(owner_type=USER_TYPE, owner_id=user.id).delete()
+            # A live offer no longer waits on them; if nobody else is left it
+            # moves on when escalate_stale_offers next sweeps it.
+            MarketOfferResponse.objects.filter(vendor=user, decision="pending").update(
+                decision="declined", decided_at=timezone.now())
+
         user.firstname = "Deleted"
         user.lastname = "User"
         user.email = f"deleted-{user.id}-{int(timezone.now().timestamp())}@deleted.invalid"
         for field in ("phone_number", "profile_picture", "referral_code", "pin",
-                      "fcm_token", "business_name", "business_address", "bank_name",
+                      "fcm_token", "business_name", "business_address", "shop_size",
+                      "payment_method", "bank_name",
                       "bank_code", "recipient_code", "account_number", "account_name",
                       "latitude", "longitude"):
             setattr(user, field, None)
@@ -320,6 +363,7 @@ def pin_reset(request):
 SOCIAL_CLOCK_SKEW_SECONDS = 60
 
 APPLE_KEYS_URL = "https://appleid.apple.com/auth/keys"
+INVALID_SIGNUP_ROLE_MESSAGE = "You can only sign up as a customer or a vendor."
 _apple_jwk_client = None
 
 
@@ -357,9 +401,16 @@ def _social_signin_response(email, firstname, lastname, role, picture, provider)
         },
     )
 
+    blocker = user.sign_in_blocker()
+    if blocker:
+        return error(blocker, status=403)
     if not user.is_active:
+        # A signup that never finished OTP; the provider has now verified the
+        # email, so complete it rather than leaving it looking unverified
+        # (which would let a later suspension be mistaken for one).
         user.is_active = True
-        user.save(update_fields=["is_active"])
+        user.email_verified_at = timezone.now()
+        user.save(update_fields=["is_active", "email_verified_at"])
 
     if created:
         Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
@@ -377,6 +428,8 @@ def google_signin(request):
     """Verify a Google ID token and sign in or create the user (upsert)."""
     id_token = request.data.get("id_token")
     role = request.data.get("role", Roles.CUSTOMER)
+    if role not in Roles.SELF_SIGNUP_ROLES:
+        return error(INVALID_SIGNUP_ROLE_MESSAGE, status=422)
     if not id_token:
         return error("id_token is required", status=422)
 
@@ -430,6 +483,8 @@ def apple_signin(request):
     """
     identity_token = request.data.get("identity_token") or request.data.get("id_token")
     role = request.data.get("role", Roles.CUSTOMER)
+    if role not in Roles.SELF_SIGNUP_ROLES:
+        return error(INVALID_SIGNUP_ROLE_MESSAGE, status=422)
     if not identity_token:
         return error("identity_token is required", status=422)
 

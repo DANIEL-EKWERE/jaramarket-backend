@@ -67,6 +67,10 @@ class UserRegistrationService:
         return user
 
     def validate_email(self, user):
+        # An OTP proves the email, but must not switch a suspended account on.
+        blocker = user.sign_in_blocker()
+        if blocker:
+            raise ValueError(blocker)
         was_active = user.is_active
         user.email_verified_at = timezone.now()
         user.is_active = True
@@ -102,8 +106,9 @@ class LoginService:
         user = User.objects.filter(email=email.lower()).first()
         if not user or not user.check_password(password):
             raise ValueError("Invalid credentials")
-        if user.deleted_at:
-            raise ValueError("This account has been deleted.")
+        blocker = user.sign_in_blocker()
+        if blocker:
+            raise ValueError(blocker)
         if not user.is_active:
             raise ValueError("Account is not active. Please verify your email.")
         user.last_login = timezone.now()
