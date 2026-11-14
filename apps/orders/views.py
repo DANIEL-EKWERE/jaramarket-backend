@@ -64,9 +64,15 @@ def orders_collection(request):
     if request.method == "GET":
         return success("Orders retrieved successfully",
                        _paginate(request, _svc.all(request.user), OrderSerializer))
+    from apps.geo.services import LocationNotServiced, record_expansion_interest
     try:
         data = _normalize_multipart_lists(request.data)
         order = _svc.create_order(request.user, data, audio_file=request.FILES.get("audio"))
+    except LocationNotServiced as e:
+        # Logged out here so it survives the rolled-back order transaction.
+        record_expansion_interest(request.user, state_id=e.state_id,
+                                  lga_id=e.lga_id, city=e.city)
+        return error(str(e), status=422)
     except ValueError as e:
         return error(str(e), status=422)
     return success("Order created successfully", OrderSerializer(order).data, status=201)

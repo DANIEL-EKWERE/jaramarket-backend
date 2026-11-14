@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
     auth, dashboard, finance, vendors, users, admins, catalogue, commissions,
     reports, orders, settings_views, profile, notifications, franchises, representatives,
-    markets, support,
+    markets, support, geography,
 )
 
 app_name = "webadmin"
@@ -65,6 +65,13 @@ urlpatterns = [
     path("support/<int:id>", support.ticket_detail_view, name="ticket_detail"),
     path("support/<int:id>/reply", support.ticket_reply_view, name="ticket_reply"),
     path("support/<int:id>/status", support.ticket_status_view, name="ticket_status"),
+
+    # Service coverage & expansion
+    path("service-areas", geography.service_areas_view, name="service_areas"),
+    path("service-areas/add", geography.service_area_add_view, name="service_area_add"),
+    path("service-areas/<int:id>/toggle", geography.service_area_toggle_view, name="service_area_toggle"),
+    path("service-areas/<int:id>/delete", geography.service_area_delete_view, name="service_area_delete"),
+    path("expansion-watchlist", geography.expansion_watchlist_view, name="expansion_watchlist"),
 
     # Catalogue: categories
     path("categories", catalogue.categories_list_view, name="categories_list"),

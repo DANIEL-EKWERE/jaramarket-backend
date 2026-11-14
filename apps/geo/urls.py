@@ -8,4 +8,6 @@ urlpatterns = [
     path("lgas/<int:lga>", v.lga_find),
     path("country", v.country_index),
     path("country/<int:c>/states", v.country_states),
+    path("service-areas", v.service_areas_index),
+    path("service-areas/check", v.service_area_check),
 ]

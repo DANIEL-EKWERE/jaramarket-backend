@@ -204,6 +204,19 @@ class OrderService:
         if not address or address.latitude is None or address.longitude is None:
             raise ValueError("A delivery address with a location is required to place an order.")
 
+        # We can only take money for an order we can actually deliver. The
+        # demand is logged by the caller, not here: this raise aborts the
+        # surrounding transaction, which would take the log row with it.
+        from apps.geo.services import (LocationNotServiced, is_serviced,
+                                       unavailable_message)
+        if not is_serviced(address.state_id, address.lga_id):
+            raise LocationNotServiced(
+                unavailable_message(
+                    address.state.name if address.state_id else None,
+                    address.lga.name if address.lga_id else None),
+                state_id=address.state_id, lga_id=address.lga_id,
+                city=address.contact_address)
+
         subtotal = self._calculate_subtotal(data)
         shipping_fee = resolve_delivery_fee(address.state_id, address.lga_id)
         vat = _d(data.get("vat", 0))
