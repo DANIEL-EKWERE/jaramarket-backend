@@ -396,6 +396,10 @@ def vendor_dashboard(request):
 def settings_view(request):
     if request.method == "GET":
         return success("Settings retrieved", {s.key: s.value for s in Setting.objects.all()})
+    # Any signed-in customer can read settings (the app needs e.g.
+    # corporate_min_price), but only admins may change them.
+    if not request.user.is_admin():
+        return error("Admin access required.", status=403)
     for key, value in request.data.items():
         Setting.objects.update_or_create(key=key, defaults={"value": value})
     return success("Settings saved")

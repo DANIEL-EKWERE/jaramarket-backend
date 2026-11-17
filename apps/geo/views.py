@@ -94,3 +94,21 @@ def service_areas_index(request):
         "lga_name": r.lga.name if r.lga_id else None,
         "covers_whole_state": r.lga_id is None,
     } for r in rows])
+
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def catalogue_visibility(request):
+    """Whether this customer can browse, and the message if not.
+
+    Lets the app render the "coming soon" state directly instead of
+    inferring it from an empty product list.
+    """
+    from .services import catalogue_access
+
+    return success("Catalogue visibility", catalogue_access(
+        state_id=request.query_params.get("state_id") or None,
+        lga_id=request.query_params.get("lga_id") or None,
+        latitude=request.query_params.get("latitude") or request.query_params.get("lat"),
+        longitude=request.query_params.get("longitude") or request.query_params.get("lng"),
+    ))

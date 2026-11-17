@@ -58,9 +58,55 @@ def vendor_categories(request):
     return success("Vendor categories retrieved", out)
 
 
+def _visibility_gate(request):
+    """Shared location gate for every browse endpoint.
+
+    Returns a Response to send back instead of the catalogue when the
+    customer is outside our coverage, or None to carry on. Being turned away
+    is also the signal that someone wants us there, so it's recorded.
+    """
+    from apps.geo.services import catalogue_access, record_expansion_interest
+
+    state_id = request.query_params.get("state_id") or None
+    lga_id = request.query_params.get("lga_id") or None
+    lat = request.query_params.get("latitude") or request.query_params.get("lat")
+    lng = request.query_params.get("longitude") or request.query_params.get("lng")
+
+    access = catalogue_access(state_id=state_id, lga_id=lga_id,
+                              latitude=lat, longitude=lng)
+    if access["visible"]:
+        return None
+
+    # Only a genuine coverage miss is evidence of demand. Someone who simply
+    # hasn't shared their location tells us nothing about whether they want us
+    # there, and logging them would inflate the watchlist with places we may
+    # already serve.
+    user = getattr(request, "user", None)
+    is_coverage_miss = access["reason"] in ("state_not_served", "lga_not_served")
+    if (is_coverage_miss and state_id and user is not None
+            and getattr(user, "is_authenticated", False)):
+        try:
+            record_expansion_interest(user, state_id=state_id, lga_id=lga_id)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception(
+                "Could not record expansion interest for state=%s lga=%s",
+                state_id, lga_id)
+
+    return success(access["message"], {
+        "items": [], "data": [], "available": False,
+        "reason": access["reason"],
+        "message": access["message"],
+        "radius_km": access.get("radius_km"),
+    })
+
+
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_all_products(request):
+    blocked = _visibility_gate(request)
+    if blocked is not None:
+        return blocked
     lga_id   = request.query_params.get("lga_id")
     state_id = request.query_params.get("state_id")
     market_id = request.query_params.get("market_id")
@@ -173,6 +219,9 @@ def categories_all_products(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def categories_limit_products(request):
+    blocked = _visibility_gate(request)
+    if blocked is not None:
+        return blocked
     limit = int(request.query_params.get("limit", 5))
     cats = list(Category.objects.filter(category_type_id=FOOD_CATEGORY_TYPE_ID).order_by("sort_by"))
     cat_ids = [c.id for c in cats]
@@ -238,6 +287,9 @@ def _price_in_range(price, min_price, max_price):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def fetch_ingredients(request):
+    blocked = _visibility_gate(request)
+    if blocked is not None:
+        return blocked
     qs = Ingredient.objects.filter(is_active=True).order_by("name")
     search = request.query_params.get("search")
     if search:
@@ -252,6 +304,9 @@ def fetch_ingredients(request):
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def fetch_product(request):
+    blocked = _visibility_gate(request)
+    if blocked is not None:
+        return blocked
     qs = Product.objects.filter(is_active=True)
     search = request.query_params.get("search")
     if search:

@@ -171,6 +171,45 @@ class OrderService:
                 unit_price = _d(link.ingredient.price)
             yield link, unit_price, recipe_quantity * ordered_quantity
 
+    @staticmethod
+    def _is_corporate(pd):
+        return str(pd.get("shopping_type") or "").lower() == "corporate"
+
+    def _product_lines(self, product, pd):
+        """Yield (ingredient, unit, unit_price, quantity, shopping_type) for one
+        ordered product.
+
+        Individual lines are the recipe at server prices (_recipe_lines).
+        A corporate line is priced from the customer's own per-ingredient
+        prices in `pd["ingredients"]` -- businesses set what they want to
+        spend on each ingredient -- but only for ingredients in the recipe,
+        and never below the admin's `corporate_min_price` setting.
+        """
+        if not (self._is_corporate(pd) and pd.get("ingredients")):
+            for link, unit_price, quantity in self._recipe_lines(product, pd.get("quantity")):
+                yield link.ingredient, link.unit, unit_price, quantity, "individual"
+            return
+
+        links = {link.ingredient_id: link for link in
+                 IngredientProduct.objects.filter(product=product).select_related("ingredient")}
+        minimum = _d(_setting("corporate_min_price", 0))
+        for line in pd["ingredients"]:
+            link = links.get(int(line.get("ingredient_id") or 0))
+            if not link:
+                raise ValueError(
+                    f"Ingredient {line.get('ingredient_id')} is not part of {product.name}.")
+            if line.get("price") is None:
+                raise ValueError(f"A price is required for {link.ingredient.name}.")
+            price = _d(line["price"])
+            if price <= 0 or price < minimum:
+                raise ValueError(
+                    f"Corporate price for {link.ingredient.name} must be at least "
+                    f"₦{max(minimum, Decimal('0.01')):,.2f}.")
+            quantity = int(line.get("quantity") or 1)
+            if quantity < 1:
+                raise ValueError("Quantity must be at least 1.")
+            yield link.ingredient, link.unit, price, _d(quantity), "corporate"
+
     def _calculate_subtotal(self, data):
         """Independently resolve the order's subtotal server-side, mirroring
         how _save_food/_save_ingredients price each line item, so the
@@ -187,7 +226,7 @@ class OrderService:
             product = Product.objects.filter(id=pd["product_id"]).first()
             if not product:
                 raise ValueError(f"Product {pd['product_id']} not found")
-            for _link, unit_price, quantity in self._recipe_lines(product, pd.get("quantity")):
+            for _ing, _unit, unit_price, quantity, _type in self._product_lines(product, pd):
                 subtotal += unit_price * quantity
         return subtotal
 
@@ -241,6 +280,11 @@ class OrderService:
             vat=vat, total=total,
             remarks=data.get("remarks"), meal_prep=data.get("meal_prep"),
             audio=audio_url,
+            # Derived from the products, not the client's top-level flag, so
+            # it always matches how the lines were actually priced.
+            shopping_type=("corporate" if any(self._is_corporate(pd)
+                                              for pd in data.get("products", []))
+                           else "individual"),
             status="pending")
 
         TransactionLogService.debit(user.id, USER_TYPE, total, order.id, ORDER_TYPE,
@@ -306,15 +350,16 @@ class OrderService:
             product = Product.objects.filter(id=pd["product_id"]).first()
             if not product:
                 raise ValueError(f"Product {pd['product_id']} not found")
-            for link, unit_price, quantity in self._recipe_lines(product, pd.get("quantity")):
+            for ingredient, unit, unit_price, quantity, shopping_type in \
+                    self._product_lines(product, pd):
                 b = self._get_bonuses(unit_price, quantity, order, user)
                 OrderItem.objects.create(
-                    order=order, product=product, ingredient=link.ingredient,
-                    quantity=int(quantity), price=unit_price, unit=link.unit,
+                    order=order, product=product, ingredient=ingredient,
+                    quantity=int(quantity), price=unit_price, unit=unit,
                     amount=b["item_total"], commision=b["commission"],
                     vendor_amount=b["item_total"] - b["commission"],
                     referral=b["referral_commission"], referral_user_id=b["referral_id"],
-                    status="pending")
+                    shopping_type=shopping_type, status="pending")
 
     def replacement_options(self, user, item_id, limit=40):
         """Ingredients that could actually replace an unavailable item.

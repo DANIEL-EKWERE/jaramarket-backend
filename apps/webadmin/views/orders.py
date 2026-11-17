@@ -30,6 +30,8 @@ def orders_list_view(request):
         qs = qs.filter(reference__icontains=s)
     if request.GET.get("market_id"):
         qs = qs.filter(items__market_id=request.GET["market_id"]).distinct()
+    if request.GET.get("shopping_type"):
+        qs = qs.filter(shopping_type=request.GET["shopping_type"])
     paginator = Paginator(qs, request.GET.get("per_page", 20))
     page = paginator.get_page(request.GET.get("page"))
     # Items are routed to markets individually, so an order can span several

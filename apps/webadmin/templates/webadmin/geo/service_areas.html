@@ -25,6 +25,22 @@
     </div>
     {% endif %}
 
+    {% comment %}LGA borders are administrative; supply isn't. This radius is
+       what lets a customer just outside an operating LGA still shop, measured
+       to the nearest market rather than to the LGA itself.{% endcomment %}
+    <div class="card p-6">
+        <h2 class="text-sm font-semibold text-slate-800 mb-1">Boundary radius</h2>
+        <p class="text-xs text-slate-400 mb-3">Customers outside an operating LGA can still browse if they're within this distance of one of your markets.</p>
+        <form method="post" action="{% url 'webadmin:visibility_radius' %}" class="flex items-end gap-3">
+            {% csrf_token %}
+            <div style="max-width:200px">
+                <label>Radius (km)</label>
+                <input type="number" step="1" min="1" max="1000" name="radius_km" value="{{ radius_km|floatformat:"-2" }}">
+            </div>
+            <button class="btn-secondary">Save radius</button>
+        </form>
+    </div>
+
     <div class="card p-6">
         <h2 class="text-sm font-semibold text-slate-800 mb-3">Add an area</h2>
         <form method="post" action="{% url 'webadmin:service_area_add' %}" class="grid grid-cols-1 md:grid-cols-[1fr_1fr_1.2fr_auto] gap-3 items-end">

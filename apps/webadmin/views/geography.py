@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from apps.geo.models import ExpansionRequest, Lga, ServiceArea, State
-from apps.geo.services import enforcement_enabled
+from apps.geo.services import enforcement_enabled, visibility_radius_km
 from ..decorators import perm_required
 
 
@@ -24,7 +24,29 @@ def service_areas_view(request):
         "states": State.objects.order_by("name"),
         "lgas": Lga.objects.select_related("state").order_by("state__name", "name"),
         "watchlist_count": ExpansionRequest.objects.count(),
+        "radius_km": visibility_radius_km(),
     })
+
+
+@require_POST
+@perm_required("manage_settings")
+def visibility_radius_view(request):
+    """How far outside an operating LGA a customer can still see the shop."""
+    from apps.support.models import Setting
+
+    raw = (request.POST.get("radius_km") or "").strip()
+    try:
+        radius = float(raw)
+        if radius <= 0 or radius > 1000:
+            raise ValueError
+    except ValueError:
+        messages.error(request, "Enter a radius between 1 and 1000 km.")
+        return redirect("webadmin:service_areas")
+
+    Setting.objects.update_or_create(key="catalogue_visibility_radius_km",
+                                     defaults={"value": str(radius)})
+    messages.success(request, f"Boundary radius set to {radius:g} km.")
+    return redirect("webadmin:service_areas")
 
 
 @require_POST

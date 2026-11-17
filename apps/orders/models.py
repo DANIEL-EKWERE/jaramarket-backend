@@ -1,6 +1,8 @@
 from django.db import models
 from api.base import SoftDeleteModel, TimestampedModel
 
+SHOPPING_TYPE_CHOICES = [("individual", "Individual"), ("corporate", "Corporate")]
+
 
 class Order(SoftDeleteModel):
     order_date = models.DateTimeField()
@@ -19,6 +21,11 @@ class Order(SoftDeleteModel):
     meal_prep = models.TextField(null=True, blank=True)
     reference = models.CharField(max_length=255, null=True, blank=True)
     scheduled_dispatch_at = models.DateTimeField(null=True, blank=True)
+    # Corporate when any food in it was bought for a business (restaurants,
+    # hotels, caterers) -- those lines are priced at the customer's own
+    # per-ingredient prices, floored at the `corporate_min_price` setting.
+    shopping_type = models.CharField(max_length=20, choices=SHOPPING_TYPE_CHOICES,
+                                     default="individual")
 
     class Meta:
         db_table = "orders"
@@ -61,6 +68,8 @@ class OrderItem(TimestampedModel):
     referral = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     referral_user = models.ForeignKey("accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
                                       db_column="referral_id", related_name="referral_order_items")
+    shopping_type = models.CharField(max_length=20, choices=SHOPPING_TYPE_CHOICES,
+                                     default="individual")
 
     class Meta:
         db_table = "order_items"

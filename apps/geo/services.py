@@ -4,6 +4,8 @@ Kept out of the order service so the app can ask the same question BEFORE a
 customer fills a basket -- being told at the payment screen that we don't
 serve your city is the worst possible moment to find out.
 """
+import math
+
 from django.db import transaction
 from django.db.models import F
 from django.utils import timezone
@@ -84,3 +86,121 @@ def record_expansion_interest(user, state_id=None, lga_id=None, city=None):
                 unique_users=F("unique_users") + 1)
     row.refresh_from_db()
     return row
+
+
+# ── Catalogue visibility ────────────────────────────────────────────────────
+# Two gates, in order:
+#   1. State -- outside a state we operate in, the customer sees nothing.
+#   2. LGA   -- inside an operating state, an operating LGA sees everything.
+#              A neighbouring LGA still qualifies if the customer is within
+#              the visibility radius of one of our markets, because LGA
+#              borders are administrative and supply isn't.
+#
+# The radius is measured to MARKETS, not to LGAs: an LGA is an area with no
+# coordinates in this schema, while a market is a real point the food
+# actually comes from -- which is also what the customer cares about.
+
+DEFAULT_VISIBILITY_RADIUS_KM = 50
+
+
+def visibility_radius_km():
+    from api.services._base import _setting
+    try:
+        return float(_setting("catalogue_visibility_radius_km",
+                              DEFAULT_VISIBILITY_RADIUS_KM)
+                     or DEFAULT_VISIBILITY_RADIUS_KM)
+    except (TypeError, ValueError):
+        return DEFAULT_VISIBILITY_RADIUS_KM
+
+
+def _haversine_km(lat1, lng1, lat2, lng2):
+    lat1, lng1, lat2, lng2 = (math.radians(float(v)) for v in (lat1, lng1, lat2, lng2))
+    d_lat, d_lng = lat2 - lat1, lng2 - lng1
+    a = (math.sin(d_lat / 2) ** 2
+         + math.cos(lat1) * math.cos(lat2) * math.sin(d_lng / 2) ** 2)
+    return 2 * 6371 * math.asin(math.sqrt(a))
+
+
+def nearest_operating_market(latitude, longitude):
+    """(market, km) for the closest market inside an operating area, or
+    (None, None). Only markets in a live service area count -- a market we
+    have paused shouldn't make its neighbours visible."""
+    from apps.vendors.models import Market
+
+    if latitude is None or longitude is None:
+        return None, None
+    best, best_km = None, None
+    markets = Market.objects.filter(is_active=True).select_related("state", "lga")
+    for market in markets:
+        if market.latitude is None or market.longitude is None:
+            continue
+        if not is_serviced(market.state_id, market.lga_id):
+            continue
+        km = _haversine_km(latitude, longitude, market.latitude, market.longitude)
+        if best_km is None or km < best_km:
+            best, best_km = market, km
+    return best, best_km
+
+
+def catalogue_access(state_id=None, lga_id=None, latitude=None, longitude=None):
+    """Can this customer see the catalogue at all?
+
+    Returns a dict the API can hand straight back:
+        visible  -- show items or not
+        reason   -- why, for the app and for debugging
+        message  -- customer-facing copy when hidden
+    """
+    if not enforcement_enabled():
+        # Dormant until someone declares a service area, so turning this on
+        # can't blank the storefront for everybody.
+        return {"visible": True, "reason": "not_configured", "message": None,
+                "radius_km": visibility_radius_km()}
+
+    radius = visibility_radius_km()
+
+    # Gate 0 -- we need to know where they actually are. The state/LGA come
+    # from a picker the customer controls; coordinates are what the radius is
+    # measured from, so without them there is no honest answer. This is a
+    # distinct reason from "not available here": telling someone we haven't
+    # launched in their area when we simply can't see where they are would be
+    # a lie, and they'd have no way to act on it.
+    if latitude in (None, "", "null") or longitude in (None, "", "null"):
+        return {"visible": False, "reason": "location_required",
+                "message": ("Turn on location so we can show you what's "
+                            "available near you."),
+                "radius_km": radius}
+
+    # Gate 1 -- the state.
+    operating_state = ServiceArea.objects.filter(
+        is_active=True, state_id=state_id).exists() if state_id else False
+    if not operating_state:
+        return {"visible": False, "reason": "state_not_served",
+                "message": _coming_soon_message(state_id, lga_id),
+                "radius_km": radius}
+
+    # Gate 2 -- the LGA, or close enough to a market in one.
+    if is_serviced(state_id, lga_id):
+        return {"visible": True, "reason": "in_service_area", "message": None,
+                "radius_km": radius}
+
+    market, km = nearest_operating_market(latitude, longitude)
+    if market is not None and km is not None and km <= radius:
+        return {"visible": True, "reason": "within_radius", "message": None,
+                "radius_km": radius, "nearest_market": market.name,
+                "distance_km": round(km, 1)}
+
+    return {"visible": False, "reason": "lga_not_served",
+            "message": _coming_soon_message(state_id, lga_id),
+            "radius_km": radius,
+            "distance_km": round(km, 1) if km is not None else None}
+
+
+def _coming_soon_message(state_id=None, lga_id=None):
+    from .models import Lga, State
+
+    state = State.objects.filter(id=state_id).first() if state_id else None
+    lga = Lga.objects.filter(id=lga_id).first() if lga_id else None
+    where = " — ".join(p for p in (lga.name if lga else None,
+                                   state.name if state else None) if p) or "your area"
+    return (f"Jaramarket isn't available in {where} just yet. We've taken note "
+            f"of your location and we'll be there soon.")

@@ -26,7 +26,7 @@ class VendorOrderItemSerializer(serializers.ModelSerializer):
             "id", "status", "quantity", "price", "unit", "amount", "vendor_amount",
             "commision", "ingredient_id", "ingredient_name", "product_id", "product_name",
             "order_reference", "customer_name", "image_url", "vendor_id", "vendor_at", "created_at",
-            "order_remarks", "order_audio",
+            "order_remarks", "order_audio", "shopping_type",
         ]
 
     def get_order_audio(self, obj):
@@ -57,7 +57,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "id", "ingredient_id", "ingredient_name", "product_id", "product_name",
             "quantity", "price", "unit", "amount", "commision", "vendor_amount",
             "status", "vendor_id", "vendor_at", "created_at", "image_url",
-            "is_unavailable", "is_forgone", "replace_deadline",
+            "is_unavailable", "is_forgone", "replace_deadline", "shopping_type",
         ]
 
     def get_is_unavailable(self, obj):
@@ -89,8 +89,10 @@ class OrderSerializer(serializers.ModelSerializer):
             "id", "reference", "order_date", "delivery_type", "shipping_fee",
             "service_charge", "vat", "total", "remarks", "meal_prep", "audio",
             "status", "address_id", "created_at", "items", "progress",
-            "scheduled_dispatch_at",
+            "scheduled_dispatch_at", "shopping_type",
         ]
+        # Set from how the lines were priced at creation; never client-editable.
+        read_only_fields = ["shopping_type"]
 
     def get_audio(self, obj):
         return _full_image_url(obj.audio)

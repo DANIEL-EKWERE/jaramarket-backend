@@ -71,6 +71,7 @@ urlpatterns = [
     path("service-areas/add", geography.service_area_add_view, name="service_area_add"),
     path("service-areas/<int:id>/toggle", geography.service_area_toggle_view, name="service_area_toggle"),
     path("service-areas/<int:id>/delete", geography.service_area_delete_view, name="service_area_delete"),
+    path("service-areas/radius", geography.visibility_radius_view, name="visibility_radius"),
     path("expansion-watchlist", geography.expansion_watchlist_view, name="expansion_watchlist"),
 
     # Catalogue: categories

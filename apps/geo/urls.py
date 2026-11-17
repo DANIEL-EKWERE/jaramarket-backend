@@ -10,4 +10,5 @@ urlpatterns = [
     path("country/<int:c>/states", v.country_states),
     path("service-areas", v.service_areas_index),
     path("service-areas/check", v.service_area_check),
+    path("catalogue-visibility", v.catalogue_visibility),
 ]

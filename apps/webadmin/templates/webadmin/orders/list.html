@@ -31,8 +31,15 @@
                 {% endfor %}
             </select>
         </div>
+        <div class="w-44">
+            <select name="shopping_type">
+                <option value="">All shoppers</option>
+                <option value="individual" {% if request.GET.shopping_type == "individual" %}selected{% endif %}>Individual</option>
+                <option value="corporate" {% if request.GET.shopping_type == "corporate" %}selected{% endif %}>Corporate</option>
+            </select>
+        </div>
         <button class="btn-primary">Filter</button>
-        {% if request.GET.status or request.GET.search or request.GET.market_id %}
+        {% if request.GET.status or request.GET.search or request.GET.market_id or request.GET.shopping_type %}
         <a href="{% url 'webadmin:orders_list' %}" class="btn-secondary">Clear</a>
         {% endif %}
     </form>
@@ -44,7 +51,7 @@
                 <tbody class="divide-y divide-slate-50">
                 {% for order in page %}
                     <tr>
-                        <td class="font-mono text-xs text-slate-500">{{ order.reference }}</td>
+                        <td class="font-mono text-xs text-slate-500">{{ order.reference }}{% if order.shopping_type == "corporate" %} <span class="badge-info">Corporate</span>{% endif %}</td>
                         <td class="font-medium text-slate-800">{{ order.user.name|default:"N/A" }}</td>
                         <td>
                             {% for name in order.routed_markets %}

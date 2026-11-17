@@ -59,6 +59,11 @@
             </div>
             <div><label>Minimum Order Amount</label><input type="number" step="0.01" name="minimum_order_amount" value="{{ s.minimum_order_amount|default:0 }}"></div>
             <div>
+                <label>Corporate Minimum Price (&#8358;)</label>
+                <input type="number" step="0.01" min="0" name="corporate_min_price" value="{{ s.corporate_min_price|default:0 }}">
+                <p class="text-xs text-slate-500 mt-1">Least a corporate customer (restaurants, hotels, caterers) may pay for any one ingredient. 0 = no minimum.</p>
+            </div>
+            <div>
                 <label>Accepted Payment Methods</label>
                 <div class="grid grid-cols-2 gap-2">
                     {% for val, label in payment_method_choices %}

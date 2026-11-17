@@ -6,9 +6,10 @@ storage_disk/s3_* fields -- those depend on Laravel's runtime disk
 reconfiguration, which has no Django equivalent, and storing S3 secret keys
 in a plain settings table is best avoided; AWS credentials stay in env vars).
 Text/number fields are free-form (Setting.value is just a TEXT column), but
-`minimum_order_amount`, `first_order_bonus` and `repeat_order_bonus` are
-actually read by api/services/order.py's order-creation logic -- these three
-are the only settings with real backend behavior behind them today.
+`minimum_order_amount`, `first_order_bonus`, `repeat_order_bonus` and
+`corporate_min_price` are actually read by api/services/order.py's
+order-creation logic -- these are the only settings with real backend
+behavior behind them today.
 """
 from django.contrib import messages
 from django.shortcuts import redirect, render
@@ -23,7 +24,7 @@ TEXT_FIELDS = [
 ]
 NUMBER_FIELDS = [
     "tax_rate", "shipping_fee", "minimum_order_amount",
-    "first_order_bonus", "repeat_order_bonus",
+    "first_order_bonus", "repeat_order_bonus", "corporate_min_price",
 ]
 PAYMENT_METHOD_CHOICES = [
     ("wallet", "Wallet Payment"), ("credit_card", "Credit Card"), ("paypal", "PayPal"),
