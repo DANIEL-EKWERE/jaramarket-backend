@@ -116,7 +116,13 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = config("APP_TIMEZONE", default="UTC")
+# Africa/Lagos, not UTC. Production runs without a .env, so this default IS
+# what production uses -- and the business runs on local time: the 18:00
+# dispatch cutoff, the 09:00 resume, offer and delivery timeouts, and every
+# timestamp an admin reads. On UTC the cutoff silently fired at 19:00 Lagos.
+# USE_TZ stays on, so everything is still stored in UTC and only rendered
+# and compared in this zone.
+TIME_ZONE = config("APP_TIMEZONE", default="Africa/Lagos")
 USE_I18N = True
 USE_TZ = True
 
