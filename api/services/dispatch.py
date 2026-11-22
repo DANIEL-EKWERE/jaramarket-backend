@@ -26,7 +26,9 @@ def _dispatch_cutoff_time():
 
 
 def _dispatch_resume_time():
-    return datetime.strptime(_setting("order_dispatch_resume_time", "07:30") or "07:30", "%H:%M").time()
+    # 08:00 -- when markets reopen and deferred orders start being shopped.
+    # Override with the order_dispatch_resume_time setting.
+    return datetime.strptime(_setting("order_dispatch_resume_time", "08:00") or "08:00", "%H:%M").time()
 
 
 def next_dispatch_time(now=None):

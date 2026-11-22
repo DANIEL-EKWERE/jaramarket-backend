@@ -324,9 +324,11 @@ def order_placed_notification(user, order):
             "tomorrow" if (local.date() - today).days == 1
             else local.strftime("on %A"))
         resume_text = f"{when} at {local.strftime('%-I:%M %p').lower()}"
-        msg = (f"Your order #{order.reference} has been placed. Markets are "
-               f"closed now, so shopping starts {resume_text}.")
-        title = "Order Placed — starts " + when
+        # Lead with the closure, not the order reference: the one thing the
+        # customer needs from this message is that nothing happens tonight.
+        msg = (f"We've closed for the day. Your order #{order.reference} "
+               f"will be shopped {resume_text} and delivered {when}.")
+        title = f"Order Placed — arriving {when}"
     else:
         msg = f"Your order #{order.reference} has been placed successfully."
         title = "Order Placed"
@@ -340,7 +342,7 @@ def order_placed_notification(user, order):
     html = order_placed_email(user.firstname or user.email, order.reference,
                               float(order.total), items_count,
                               resume_text=resume_text)
-    subject = (f"Order #{order.reference} Placed — shopping starts {resume_text}"
+    subject = (f"Order #{order.reference} received — we've closed for the day"
                if resume_text else f"Order #{order.reference} Placed Successfully")
     send_email(user.email, subject, msg, html=html)
 
