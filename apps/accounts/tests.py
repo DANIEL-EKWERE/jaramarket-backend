@@ -218,6 +218,31 @@ class SelfAssignedRoleTests(TestCase):
         self.assertEqual(res.status_code, 201, res.content)
         self.assertEqual(res.json()["data"]["role"], Roles.VENDOR)
 
+    def test_google_signup_gets_a_referral_code(self):
+        self.assertEqual(self._google("eve@example.com", Roles.CUSTOMER).status_code, 201)
+        self.assertEqual(len(User.objects.get(email="eve@example.com").referral_code or ""), 8)
+
+    def test_google_backfills_a_missing_referral_code(self):
+        User.objects.create_user("ada@example.com", "secret123", firstname="Ada",
+                                 lastname="Obi", role=Roles.CUSTOMER, is_active=True)
+        self._google("ada@example.com", Roles.CUSTOMER)
+        self.assertTrue(User.objects.get(email="ada@example.com").referral_code)
+
+    def test_google_signup_links_the_referrer(self):
+        friend = User.objects.create_user("ada@example.com", "secret123", firstname="Ada",
+                                          lastname="Obi", role=Roles.CUSTOMER, is_active=True,
+                                          referral_code="FRIEND01")
+        with override_settings(GOOGLE_CLIENT_IDS="test-client"), patch(
+                "google.oauth2.id_token.verify_oauth2_token",
+                return_value={"email": "eve@example.com", "given_name": "Eve"}):
+            res = self.client.post("/api/jaram/google-signin",
+                                   {"id_token": "t", "role": Roles.CUSTOMER,
+                                    "referral_code": "FRIEND01"}, format="json")
+        self.assertEqual(res.status_code, 201, res.content)
+        self.assertEqual(User.objects.get(email="eve@example.com").referrer_id, friend.id)
+        friend.refresh_from_db()
+        self.assertEqual(friend.referral_count, 1)
+
     def test_existing_customer_is_not_upgraded_by_the_vendor_app(self):
         User.objects.create_user("ada@example.com", "secret123", firstname="Ada",
                                  lastname="Obi", role=Roles.CUSTOMER, is_active=True)

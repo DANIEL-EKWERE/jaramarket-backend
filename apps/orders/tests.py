@@ -53,3 +53,51 @@ class CorporatePricingTests(TestCase):
         data = {"products": [{"product_id": self.jollof.id, "quantity": 1,
                               "shopping_type": "corporate"}]}
         self.assertEqual(self.svc._calculate_subtotal(data), Decimal("3500"))
+
+
+class ReferralEarningsTests(TestCase):
+    def setUp(self):
+        from django.utils import timezone
+        from rest_framework.test import APIClient
+        from apps.accounts.models import Roles, User
+        from apps.orders.models import Order, OrderItem
+        from api.services.order import TransactionLogService
+        from api.services._base import USER_TYPE
+
+        self.inviter = User.objects.create_user(
+            "ada@example.com", "secret123", firstname="Ada", lastname="Obi",
+            role=Roles.CUSTOMER, is_active=True, referral_code="ADA00001")
+        friend = User.objects.create_user(
+            "eve@example.com", "secret123", firstname="Eve", lastname="X",
+            role=Roles.CUSTOMER, is_active=True, referrer=self.inviter)
+        rice = Ingredient.objects.create(name="Rice", price=Decimal("2000"), unit="cup")
+
+        def order(status, referral):
+            o = Order.objects.create(order_date=timezone.now(), user=friend,
+                                     delivery_type="standard", total=Decimal("5000"),
+                                     status=status)
+            OrderItem.objects.create(order=o, ingredient=rice, quantity=1,
+                                     price=Decimal("2000"), referral=Decimal(referral),
+                                     referral_user=self.inviter)
+            return o
+
+        paid = order("completed", "150")
+        order("pending", "40")
+        order("cancelled", "999")
+        # What mark_completed records when admin approves `paid`.
+        TransactionLogService.credit(self.inviter.id, USER_TYPE, Decimal("150"),
+                                     paid.id, "App\\Models\\Order", "NGN",
+                                     "Referral commission")
+        self.client = APIClient()
+        self.client.force_authenticate(self.inviter)
+
+    def test_summary(self):
+        data = self.client.get("/api/jaram/referral-earnings").json()["data"]
+        self.assertEqual(data["total_earned"], "150.00")
+        self.assertEqual(data["pending"], "40.00")
+        self.assertEqual(data["referrals_count"], 1)
+        self.assertEqual(len(data["recent"]), 1)
+
+    def test_per_friend_earned(self):
+        data = self.client.get("/api/jaram/my-referrals").json()["data"]
+        self.assertEqual(data[0]["earned"], "150.00")

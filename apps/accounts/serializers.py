@@ -19,10 +19,23 @@ class UserSerializer(serializers.ModelSerializer):
 
 class ReferralSerializer(serializers.ModelSerializer):
     name = serializers.CharField(read_only=True)
+    # Referral commission already paid to the inviter from this friend's
+    # approved orders (pass the inviter as context["referrer"]).
+    earned = serializers.SerializerMethodField()
 
     class Meta:
         model = User
-        fields = ["id", "name", "email", "phone_number", "created_at"]
+        fields = ["id", "name", "email", "phone_number", "created_at", "earned"]
+
+    def get_earned(self, obj):
+        referrer = self.context.get("referrer")
+        if referrer is None:
+            return "0.00"
+        from api.services.referral import paid_referral_items
+        from django.db.models import Sum
+        total = (paid_referral_items(referrer).filter(order__user=obj)
+                 .aggregate(t=Sum("referral"))["t"])
+        return f"{total or 0:.2f}"
 
 
 class RegisterSerializer(serializers.Serializer):

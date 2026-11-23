@@ -280,7 +280,17 @@ def change_password(request):
 @api_view(["GET"])
 def my_referrals(request):
     qs = request.user.referrals.order_by("-created_at")
-    return success("Refferals retrieved successfully", ReferralSerializer(qs, many=True).data, status=201)
+    return success("Refferals retrieved successfully",
+                   ReferralSerializer(qs, many=True, context={"referrer": request.user}).data,
+                   status=201)
+
+
+@api_view(["GET"])
+def referral_earnings(request):
+    """Totals for Refer & Earn: paid to the wallet so far, still pending on
+    friends' orders awaiting approval, friends invited, recent payouts."""
+    from api.services.referral import referral_summary
+    return success("Referral earnings retrieved", referral_summary(request.user))
 
 
 @api_view(["POST"])
@@ -382,11 +392,16 @@ def _get_apple_jwk_client():
     return _apple_jwk_client
 
 
-def _social_signin_response(email, firstname, lastname, role, picture, provider):
+def _social_signin_response(email, firstname, lastname, role, picture, provider,
+                            referral_code=None):
     """Shared upsert + token issue for social providers (Google/Apple):
     the provider has already verified the email, so the account is created
-    pre-verified, and an existing account with that email just signs in."""
+    pre-verified, and an existing account with that email just signs in.
+
+    `referral_code` is the code of the friend who invited them; it only
+    counts when this call creates the account, same as email sign-up."""
     from apps.finance.models import Wallet
+    from api.services.auth import UserRegistrationService
 
     user, created = User.objects.get_or_create(
         email=email,
@@ -412,8 +427,21 @@ def _social_signin_response(email, firstname, lastname, role, picture, provider)
         user.email_verified_at = timezone.now()
         user.save(update_fields=["is_active", "email_verified_at"])
 
+    # Every account needs its own code for Refer & Earn. Social sign-ups
+    # used to be created without one, so older accounts get theirs here too.
+    if not user.referral_code:
+        user.referral_code = UserRegistrationService()._generate_referral_code()
+        user.save(update_fields=["referral_code"])
+
     if created:
         Wallet.objects.get_or_create(user=user, defaults={"balance": 0})
+        referrer = (User.objects.filter(referral_code=referral_code.strip()).exclude(id=user.id).first()
+                    if referral_code and referral_code.strip() else None)
+        if referrer:
+            user.referrer = referrer
+            user.save(update_fields=["referrer"])
+            referrer.referral_count = (referrer.referral_count or 0) + 1
+            referrer.save(update_fields=["referral_count"])
 
     from api.services._base import issue_tokens
     tokens = issue_tokens(user)
@@ -468,7 +496,8 @@ def google_signin(request):
 
     return _social_signin_response(
         email, idinfo.get("given_name", ""), idinfo.get("family_name", ""),
-        role, idinfo.get("picture", ""), "Google")
+        role, idinfo.get("picture", ""), "Google",
+        referral_code=request.data.get("referral_code"))
 
 
 @api_view(["POST"])
@@ -530,4 +559,5 @@ def apple_signin(request):
 
     return _social_signin_response(
         email, request.data.get("firstname", ""), request.data.get("lastname", ""),
-        role, "", "Apple")
+        role, "", "Apple",
+        referral_code=request.data.get("referral_code"))
