@@ -1,12 +1,13 @@
 """Order service and transaction ledger."""
 import secrets
 import string
-from datetime import timedelta
+from datetime import datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 
 from apps.accounts.models import Roles, User
 from apps.catalogue.models import Ingredient, IngredientProduct, Product
@@ -230,6 +231,34 @@ class OrderService:
                 subtotal += unit_price * quantity
         return subtotal
 
+    @staticmethod
+    def _resolve_order_date(raw):
+        """When the order was actually placed.
+
+        The app sends a date with no time ("2026-11-18"), which Django reads
+        as midnight -- so every order looked like it was placed at 00:00, and
+        under a +01:00 timezone that stores as 23:00 the PREVIOUS day. The
+        wall-clock moment the request arrives is the truth, so a value with
+        no time of day is ignored rather than trusted. A full timestamp is
+        still honoured (and made timezone-aware) for scheduled orders.
+        """
+        now = timezone.now()
+        if not raw:
+            return now
+        if isinstance(raw, datetime):
+            parsed = raw
+        else:
+            text = str(raw).strip()
+            # Date-only: no time was given, so there is nothing to honour.
+            if len(text) <= 10:
+                return now
+            parsed = parse_datetime(text)
+            if parsed is None:
+                return now
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed, timezone.get_current_timezone())
+        return parsed
+
     @transaction.atomic
     def create_order(self, user, data, audio_file=None):
         # The delivery address is resolved first because the delivery fee is
@@ -272,7 +301,7 @@ class OrderService:
             audio_url = save_uploaded_file(audio_file, "orders")
 
         order = Order.objects.create(
-            order_date=data.get("order_date") or timezone.now(),
+            order_date=self._resolve_order_date(data.get("order_date")),
             reference=self._reference(), user=user, address=address,
             delivery_type=data.get("delivery_type", "standard"),
             shipping_fee=shipping_fee,
