@@ -11,7 +11,7 @@ others from running, because the others are what keep paid-for orders moving.
 import time
 import traceback
 
-from django.core.management import call_command
+from django.core.management import call_command, get_commands
 from django.core.management.base import BaseCommand
 
 # (command, description). FREQUENT runs every few minutes; SLOW is heavier and
@@ -51,9 +51,22 @@ class Command(BaseCommand):
                 return
 
         if opts["list"]:
+            # Also a deploy check: a job whose management command is not
+            # installed fails on EVERY run, and finding that out from a cron
+            # log half an hour later is the expensive way to learn it.
+            installed = get_commands()
             for name, description in FREQUENT + SLOW:
                 tier = "frequent" if (name, description) in FREQUENT else "slow"
-                self.stdout.write(f"  {name:32} [{tier}] {description}")
+                flag = "" if name in installed else "   <-- MISSING"
+                self.stdout.write(f"  {name:32} [{tier}] {description}{flag}")
+            missing = [n for n, _ in FREQUENT + SLOW if n not in installed]
+            if missing:
+                self.stderr.write(self.style.ERROR(
+                    f"\n{len(missing)} job(s) have no management command on this "
+                    f"machine: {', '.join(missing)}"))
+                self.stderr.write(self.style.ERROR(
+                    "This is an incomplete deployment, not a config problem."))
+                raise SystemExit(1)
             return
 
         started = time.time()
