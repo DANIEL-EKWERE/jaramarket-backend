@@ -86,13 +86,21 @@ def send_email(to, subject, body, html=None):
 
 def order_status_notification(user, order, status):
     from .email_templates import order_status_email, order_cancelled_refund_email
+    # Named by its contents rather than its reference -- see _order_label.
+    # Upper-case only the first letter: str.capitalize() would lower-case the
+    # rest and turn "Egusi Soup" into "egusi soup".
+    raw_label = _order_label(order)
+    label = raw_label[:1].upper() + raw_label[1:]
     messages = {
-        "pending":    f"Your order #{order.reference} has been placed successfully.",
-        "processing": f"Your order #{order.reference} is now being prepared.",
-        "completed":  f"Your order #{order.reference} has been delivered. Enjoy!",
-        "cancelled":  f"Your order #{order.reference} has been cancelled.",
+        "pending":    f"{label} has been placed successfully.",
+        "processing": f"{label} is being shopped for now.",
+        "delivered":  f"{label} has arrived at our hub.",
+        "completed":  f"{label} is confirmed and on its way.",
+        "in_transit": f"{label} is out for delivery.",
+        "received":   f"{label} is complete. Enjoy!",
+        "cancelled":  f"{label} has been cancelled.",
     }
-    msg = messages.get(status, f"Your order #{order.reference} is now {status}.")
+    msg = messages.get(status, f"{label} is now {status}.")
     result = notify(user, "OrderStatusNotification", {
         "type": "order_status", "title": f"Order {status.title()}",
         "message": msg, "order_id": str(order.id), "status": status,
@@ -107,11 +115,61 @@ def order_status_notification(user, order, status):
 
 
 def order_item_status_notification(user, order_item, status):
-    msg = f"An item in your order is now {status}."
+    """One line of an order moved on.
+
+    "An item in your order is now processing" told the customer nothing --
+    not which item, and not what it means for them. Name the item, and say
+    what happened in plain words.
+    """
+    name = _order_item_label(order_item)
+    dish = (order_item.product.name
+            if order_item.product_id and order_item.product else None)
+    # A food order explodes into ingredient rows, so an ingredient on its own
+    # is confusing -- anchor it to the dish it belongs to.
+    subject = f"{name} for your {dish}" if dish and dish != name else name
+
+    wording = {
+        "processing": (f"{subject} is being shopped for now.", "Shopping started"),
+        "delivered": (f"{subject} has been delivered to us.", "Item delivered"),
+        "completed": (f"{subject} is confirmed and on its way.", "Item confirmed"),
+        "cancelled": (f"{subject} was removed from your order.", "Item removed"),
+    }
+    msg, title = wording.get(
+        status, (f"{subject} is now {status}.", "Item update"))
+
     return notify(user, "OrderItemStatusNotification", {
-        "type": "order_item_status", "title": "Item Update",
-        "message": msg, "order_item_id": str(order_item.id), "status": status,
+        "type": "order_item_status", "title": title,
+        "message": msg, "order_item_id": str(order_item.id),
+        "order_id": str(order_item.order_id), "item_name": name,
+        "status": status,
     }, channels=("database", "fcm"))
+
+
+def _order_label(order, max_names=2):
+    """Name an order by what's in it.
+
+    "Your order #ORD-8US4KQ..." means nothing to a customer -- they remember
+    the food, not the reference. Falls back to the reference only when there
+    is nothing nameable (and it still travels in the payload either way, so
+    support can always look it up).
+    """
+    names = []
+    for item in order.items.all():
+        if item.status == "cancelled":
+            continue
+        name = (item.product.name if item.product_id and item.product
+                else (item.ingredient.name if item.ingredient_id and item.ingredient
+                      else None))
+        if name and name not in names:
+            names.append(name)
+    if not names:
+        return f"order #{order.reference}"
+    if len(names) == 1:
+        return f"your {names[0]} order"
+    if len(names) <= max_names:
+        return f"your {' and '.join(names)} order"
+    return (f"your {', '.join(names[:max_names])} and "
+            f"{len(names) - max_names} more order")
 
 
 def _order_item_label(order_item):
@@ -179,14 +237,14 @@ def order_item_forgone_notification(user, order, order_item, refund,
     from .email_templates import order_item_forgone_email
 
     name = _order_item_label(order_item)
+    label = _order_label(order)
     if automatic:
         title = "Item Removed Automatically"
         msg = (f"No replacement was chosen in time, so {name} was removed from "
-               f"order #{order.reference}. ₦{refund:,.2f} has been returned to "
-               f"your wallet.")
+               f"{label}. ₦{refund:,.2f} has been returned to your wallet.")
     else:
         title = "Item Removed"
-        msg = (f"{name} was removed from order #{order.reference}. "
+        msg = (f"{name} was removed from {label}. "
                f"₦{refund:,.2f} has been returned to your wallet.")
 
     result = notify(user, "OrderItemForgoneNotification", {
