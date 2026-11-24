@@ -12,3 +12,6 @@ jaramarket-*.json
 .env
 # Cron output — runtime noise, not source
 logs/
+
+# Machine-specific interpreter override for scripts/cron.sh
+.python_path

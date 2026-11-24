@@ -322,10 +322,14 @@ class OrderService:
         self._save_food(data, order, user)
         self._save_ingredients(data, order, user)
 
-        from ..notifications import wallet_notification, order_placed_notification
+        from ..notifications import (_order_label, wallet_notification,
+                                     order_placed_notification)
         wallet = Wallet.objects.filter(user=user).first()
+        # The comment becomes the push body, so name the food rather than the
+        # reference. The reference still rides along as the second argument
+        # and stays on the ledger entry for support to search by.
         wallet_notification(user, "debit", total, wallet.balance if wallet else 0,
-                            order.reference, f"Payment for Order #{order.reference}")
+                            order.reference, f"Payment for {_order_label(order)}")
 
         # Whether the order is paused has to be settled BEFORE the customer is
         # told it was placed -- otherwise they get "placed successfully" and
@@ -674,12 +678,14 @@ class OrderService:
                                      ORDER_TYPE, "NGN", f"Refund from Order #{order.reference}")
         order.status = "cancelled"
         order.save(update_fields=["status"])
-        from ..notifications import order_status_notification, wallet_notification
+        from ..notifications import (_order_label, order_status_notification,
+                                     wallet_notification)
         from apps.finance.models import Wallet as _Wallet
         wallet = _Wallet.objects.filter(user_id=order.user_id).first()
         wallet_notification(order.user, "credit", order.total,
                             wallet.balance if wallet else 0,
-                            order.reference, f"Refund for cancelled Order #{order.reference}")
+                            order.reference,
+                            f"Refund for your cancelled {_order_label(order).removeprefix('your ')}")
         order_status_notification(order.user, order, "cancelled")
         return order
 
