@@ -149,7 +149,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ── DRF ──
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # Standard JWT plus the one-device rule for vendors; see
+        # apps/accounts/authentication.py.
+        "apps.accounts.authentication.SingleSessionJWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": ("rest_framework.permissions.IsAuthenticated",),
     "DEFAULT_FILTER_BACKENDS": (
@@ -171,6 +173,29 @@ SIMPLE_JWT = {
     # Use a dedicated signing key (min 32 chars for HS256). Falls back to SECRET_KEY.
     "SIGNING_KEY": config("JWT_SECRET_KEY", default=None) or SECRET_KEY,
 }
+
+# ── Public legal pages ──
+# Shown on /privacy-policy and /terms, which the app stores require to be
+# publicly reachable. Production runs without a .env, so these DEFAULTS are
+# what actually gets published -- change them here, not only in an env var.
+LEGAL_COMPANY_NAME = config("LEGAL_COMPANY_NAME", default="JaraMarket")
+# Matches the address already published in the apps' Terms of Service screen.
+LEGAL_CONTACT_EMAIL = config("LEGAL_CONTACT_EMAIL", default="jaramarket101@gmail.com")
+# Left blank deliberately: an empty value is omitted from the page, which is
+# better than publishing a placeholder like "[Your Phone Number]".
+# From the vendor app's published policy screen.
+LEGAL_CONTACT_PHONE = config("LEGAL_CONTACT_PHONE", default="08088884983")
+LEGAL_WEBSITE = config("LEGAL_WEBSITE", default="https://jaramarket.com.ng")
+LEGAL_EFFECTIVE_DATE = config("LEGAL_EFFECTIVE_DATE", default="24 November 2026")
+# STILL REQUIRED. The policy's section 24 asks for a registered company name,
+# a registered business address and a dedicated privacy mailbox. None of those
+# can be guessed, so they default to empty and are OMITTED from the rendered
+# page -- an absent row is honest, "[Insert support email]" is not. Fill these
+# in before relying on the policy for an app store submission or an NDPA
+# enquiry.
+LEGAL_REGISTERED_NAME = config("LEGAL_REGISTERED_NAME", default="")
+LEGAL_BUSINESS_ADDRESS = config("LEGAL_BUSINESS_ADDRESS", default="")
+LEGAL_PRIVACY_EMAIL = config("LEGAL_PRIVACY_EMAIL", default="")
 
 # ── CORS ──
 CORS_ALLOW_ALL_ORIGINS = config("CORS_ALLOW_ALL", default=True, cast=bool)

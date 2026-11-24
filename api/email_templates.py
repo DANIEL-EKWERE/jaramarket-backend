@@ -278,15 +278,29 @@ def new_order_vendor_email(vendor_name, order_ref, items_count):
 
 # ── Wallet ────────────────────────────────────────────────────────────────────
 
-def wallet_funded_email(firstname, amount, balance, reference):
+def wallet_funded_email(firstname, amount, balance, reference,
+                        gross=None, fee=0):
+    """`amount` is what landed in the wallet.
+
+    When the payment processor took a cut, `gross`/`fee` itemise it. Showing
+    only the credited figure against a larger amount on the customer's bank
+    statement reads as a shortfall, so the deduction is spelled out.
+    """
+    rows = []
+    if fee and float(fee) > 0:
+        rows.append(_row("Amount Paid", f"₦{float(gross or amount):,.2f}"))
+        rows.append(_row("Payment Charge", f"−₦{float(fee):,.2f}"))
+    rows.append(_row("Amount Credited", f"₦{float(amount):,.2f}"))
+    rows.append(_row("New Balance", f"₦{float(balance):,.2f}"))
+    rows.append(_row("Reference", str(reference)))
+
     body = (
         _h2("Wallet Funded Successfully")
         + _p(f"Hi {firstname}, your Jaramarket wallet has been credited.")
-        + _table(
-            _row("Amount Credited", f"₦{float(amount):,.2f}"),
-            _row("New Balance", f"₦{float(balance):,.2f}"),
-            _row("Reference", str(reference)),
-        )
+        + _table(*rows)
+        + (_p("The payment charge is what your bank/card processor deducts "
+              "for the transfer. It is not a Jaramarket fee.")
+           if fee and float(fee) > 0 else "")
         + _p("You can now use your wallet balance to place orders on Jaramarket.")
     )
     return _base("Wallet Funded", body)

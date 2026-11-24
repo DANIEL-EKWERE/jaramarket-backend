@@ -115,27 +115,68 @@ class HandlePaystackWebhookService:
         if log and log.status == "success":
             return {"event": "charge.success", "handled": True, "note": "already processed"}
 
-        if user_id and amount_naira > 0:
-            TransactionLogService.credit(int(user_id), USER_TYPE, amount_naira,
+        # Paystack keeps a cut of every charge, and it is NOT included in what
+        # reaches our balance. Crediting the gross amount therefore funded the
+        # wallet with money we never received, and the shortfall came out of
+        # the platform on every single top-up.
+        #
+        # The fee is taken from what Paystack reports on the transaction rather
+        # than recomputed from their published schedule: the schedule changes
+        # without notice, differs by channel (card vs bank transfer vs USSD),
+        # waives the flat fee under a threshold and caps the total. Their
+        # number is the one that actually moved.
+        fee_naira = _d(data.get("fees") or 0) / 100
+        if fee_naira < 0:
+            fee_naira = _d(0)
+        # A fee at or above the charge means we have misread the payload, so
+        # take nothing rather than credit a negative or empty amount.
+        if fee_naira >= amount_naira:
+            import logging
+            logging.getLogger(__name__).error(
+                "Paystack fee %s >= amount %s on %s - crediting gross and "
+                "not deducting; check the webhook payload.",
+                fee_naira, amount_naira, reference)
+            fee_naira = _d(0)
+        credit_naira = amount_naira - fee_naira
+
+        if user_id and credit_naira > 0:
+            TransactionLogService.credit(int(user_id), USER_TYPE, credit_naira,
                                          comment=f"Wallet funding ({reference})")
             if log:
                 log.status = "success"
                 log.gateway_response = "Paystack charge.success"
-                log.save(update_fields=["status", "gateway_response"])
+                # Keep amount as the gross charged; the split lives in meta so
+                # a top-up can be reconciled against the Paystack settlement.
+                log.meta = {**(log.meta or {}),
+                            "gross_naira": str(amount_naira),
+                            "gateway_fee_naira": str(fee_naira),
+                            "credited_naira": str(credit_naira)}
+                log.save(update_fields=["status", "gateway_response", "meta"])
             user = _User.objects.filter(id=user_id).first()
             if user:
                 from ..email_templates import wallet_funded_email
                 wallet = Wallet.objects.filter(user=user).first()
-                wallet_notification(user, "credit", amount_naira,
+                # Say the fee out loud. Someone who pays 10,000 and sees 9,750
+                # will otherwise assume they have been short-changed, and that
+                # is a support ticket every time.
+                note = (f"Wallet funded with ₦{credit_naira}"
+                        if fee_naira <= 0 else
+                        f"Wallet funded with ₦{credit_naira} "
+                        f"(₦{amount_naira} less ₦{fee_naira} payment charge)")
+                wallet_notification(user, "credit", credit_naira,
                                     wallet.balance if wallet else 0,
-                                    reference, f"Wallet funded with ₦{amount_naira}")
+                                    reference, note)
                 html = wallet_funded_email(user.firstname or user.email,
-                                          amount_naira,
+                                          credit_naira,
                                           wallet.balance if wallet else 0,
-                                          reference)
+                                          reference,
+                                          gross=amount_naira, fee=fee_naira)
                 send_email(user.email, "Wallet Funded Successfully",
-                           f"Your wallet has been credited with ₦{amount_naira}.", html=html)
-        return {"event": "charge.success", "handled": True}
+                           f"Your wallet has been credited with ₦{credit_naira}.",
+                           html=html)
+        return {"event": "charge.success", "handled": True,
+                "gross": str(amount_naira), "fee": str(fee_naira),
+                "credited": str(credit_naira)}
 
     def _transfer_status(self, data, status, refund=False):
         from apps.accounts.models import User as _User

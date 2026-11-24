@@ -105,6 +105,15 @@ def login(request):
 
 @api_view(["POST"])
 def logout(request):
+    user = getattr(request, "user", None)
+    is_vendor = getattr(user, "is_vendor", None)
+    if callable(is_vendor) and is_vendor():
+        # Rotate rather than clear. A blank session id means "signed in before
+        # this rule existed" and is allowed through, so clearing it here would
+        # hand the just-logged-out token a free pass back in.
+        import uuid
+        User.all_objects.filter(pk=user.pk).update(
+            active_session_id=uuid.uuid4().hex)
     return success("Session ended! Logout was successful.")
 
 

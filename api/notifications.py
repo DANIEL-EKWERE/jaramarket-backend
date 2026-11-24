@@ -82,6 +82,24 @@ def send_email(to, subject, body, html=None):
         return {"sent": False, "error": str(exc)}
 
 
+# Customer-facing names for each stage.
+#
+# The raw status values are warehouse vocabulary and must never be shown as-is.
+# "delivered" in particular means the VENDORS dropped the goods at our hub --
+# to a customer that reads as "my food has arrived", which it has not. The
+# stage an admin approves is the point shopping is finished, so that is what
+# it says.
+ORDER_STATUS_LABELS = {
+    "pending": "Order placed",
+    "processing": "Shopping started",
+    "delivered": "Items at our hub",
+    "completed": "Shopping completed",
+    "in_transit": "Out for delivery",
+    "received": "Order complete",
+    "cancelled": "Order cancelled",
+}
+
+
 # ── Convenience builders mirroring the Laravel notification classes ──
 
 def order_status_notification(user, order, status):
@@ -94,15 +112,17 @@ def order_status_notification(user, order, status):
     messages = {
         "pending":    f"{label} has been placed successfully.",
         "processing": f"{label} is being shopped for now.",
-        "delivered":  f"{label} has arrived at our hub.",
-        "completed":  f"{label} is confirmed and on its way.",
+        "delivered":  f"{label} has been shopped and is at our hub for checks.",
+        "completed":  f"{label}: shopping is complete and approved. We're "
+                      f"preparing it for delivery.",
         "in_transit": f"{label} is out for delivery.",
         "received":   f"{label} is complete. Enjoy!",
         "cancelled":  f"{label} has been cancelled.",
     }
     msg = messages.get(status, f"{label} is now {status}.")
+    title = ORDER_STATUS_LABELS.get(status, f"Order {status.title()}")
     result = notify(user, "OrderStatusNotification", {
-        "type": "order_status", "title": f"Order {status.title()}",
+        "type": "order_status", "title": title,
         "message": msg, "order_id": str(order.id), "status": status,
     }, channels=("database", "fcm"))
     if status == "cancelled":
@@ -110,7 +130,7 @@ def order_status_notification(user, order, status):
         send_email(user.email, f"Order #{order.reference} Cancelled — Refund Processed", msg, html=html)
     else:
         html = order_status_email(user.firstname or user.email, order.reference, status, msg)
-        send_email(user.email, f"Order #{order.reference} — {status.title()}", msg, html=html)
+        send_email(user.email, f"Order #{order.reference} — {title}", msg, html=html)
     return result
 
 
@@ -130,7 +150,8 @@ def order_item_status_notification(user, order_item, status):
 
     wording = {
         "processing": (f"{subject} is being shopped for now.", "Shopping started"),
-        "delivered": (f"{subject} has been delivered to us.", "Item delivered"),
+        "delivered": (f"{subject} has been shopped and is at our hub.",
+                      "Shopping done"),
         "completed": (f"{subject} is confirmed and on its way.", "Item confirmed"),
         "cancelled": (f"{subject} was removed from your order.", "Item removed"),
     }
@@ -405,6 +426,19 @@ def order_placed_notification(user, order):
     send_email(user.email, subject, msg, html=html)
 
 
+# Android notification channels, as created by the vendor app in main.dart.
+# They must match on both sides or the tone silently falls back to default.
+# A channel's sound cannot be changed after Android creates it, so a new tone
+# means a new id here AND in the app -- hence the version suffix.
+ANDROID_ORDER_CHANNEL = "order_channel_v2"
+ANDROID_GENERAL_CHANNEL = "high_importance_channel"
+# Matches android/app/src/main/res/raw/order_alert.wav, without extension.
+ANDROID_ORDER_SOUND = "order_alert"
+# The notification types that mean "an order is waiting for you". Both are
+# vendor-only: new_order_notification and order_item_offer_notification.
+ANDROID_ORDER_ALERT_TYPES = frozenset({"new_order", "market_offer"})
+
+
 class FirebasePush:
     """FCM sender using Firebase Admin SDK. No-op if FIREBASE_CREDENTIALS is not set."""
     _app = None
@@ -448,20 +482,49 @@ class FirebasePush:
             return {"skipped": True, "reason": "FIREBASE_CREDENTIALS not configured"}
         try:
             from firebase_admin import messaging
+
+            # Which Android channel plays this, and with what tone.
+            #
+            # When the app is backgrounded, ANDROID draws the notification --
+            # not the app -- so the tone comes from the channel named here.
+            # Sending every push to the general channel is why the custom
+            # order alert never played: the app had the sound, but nothing
+            # ever routed an order to the channel that owns it.
+            #
+            # These ids must match the ones the vendor app creates in
+            # main.dart. The _v2 suffix is deliberate: an Android channel's
+            # sound is immutable once created, so changing the tone means a
+            # new id on both sides.
+            # Only the two "an order has arrived for you" types are loud,
+            # and both go exclusively to vendors. Customer-facing progress
+            # updates stay on the general channel -- an alarm tone for "your
+            # order was delivered" is alarming for no reason.
+            notif_type = str((data or {}).get("type") or "")
+            is_order_alert = notif_type in ANDROID_ORDER_ALERT_TYPES
+
+            # default_sound and a custom sound are mutually exclusive --
+            # setting both leaves the tone to FCM's discretion.
+            tone = ({"sound": ANDROID_ORDER_SOUND} if is_order_alert
+                    else {"default_sound": True})
+
             message = messaging.Message(
                 notification=messaging.Notification(title=title, body=body),
                 data={k: str(v) for k, v in (data or {}).items()},
                 android=messaging.AndroidConfig(
                     priority="high",
                     notification=messaging.AndroidNotification(
-                        channel_id="high_importance_channel",
+                        channel_id=(ANDROID_ORDER_CHANNEL if is_order_alert
+                                    else ANDROID_GENERAL_CHANNEL),
                         priority="max",
-                        default_sound=True,
                         default_vibrate_timings=True,
+                        **tone,
                     ),
                 ),
                 apns=messaging.APNSConfig(
                     payload=messaging.APNSPayload(
+                        # iOS stays on the system tone. A custom one needs the
+                        # audio file bundled in the iOS app, and naming a file
+                        # that isn't there plays silence, not a fallback.
                         aps=messaging.Aps(sound="default", badge=1),
                     ),
                 ),

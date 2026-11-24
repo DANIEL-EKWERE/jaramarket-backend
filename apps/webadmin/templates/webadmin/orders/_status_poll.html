@@ -1,0 +1,126 @@
+{% comment %}
+Live order-status polling for the orders screens.
+
+Polls webadmin:orders_status_feed every 5s and updates the badges in place.
+Deliberately NOT a page reload on a timer: this screen carries filters, a
+search box and a scroll position, and throwing those away every five seconds
+would make it unusable exactly when it is busiest.
+
+Include this inside {% block extra_scripts %} on any page whose markup has
+[data-order-status] / [data-item-status] elements.
+{% endcomment %}
+<script>
+(function () {
+    const FEED = "{% url 'webadmin:orders_status_feed' %}";
+    const INTERVAL_MS = 5000;
+
+    const orderEls = () => document.querySelectorAll('[data-order-status]');
+    const itemEls = () => document.querySelectorAll('[data-item-status]');
+
+    if (!orderEls().length && !itemEls().length) return;
+
+    const indicator = document.getElementById('status-poll-indicator');
+    let failures = 0;
+    let timer = null;
+
+    function idsOf(nodes, attr) {
+        return Array.from(nodes).map((el) => el.getAttribute(attr)).join(',');
+    }
+
+    function apply(nodes, attr, data) {
+        let changed = 0;
+        let reload = false;
+        nodes.forEach((el) => {
+            const fresh = data[el.getAttribute(attr)];
+            if (!fresh || fresh.status === el.dataset.currentStatus) return;
+
+            el.dataset.currentStatus = fresh.status;
+            el.textContent = fresh.label;
+            // Badge classes are mutually exclusive, so clear all of them
+            // rather than toggling the one we happen to know about.
+            el.classList.remove('badge-warning', 'badge-info',
+                                'badge-success', 'badge-danger');
+            el.classList.add(fresh.badge);
+            // Brief highlight: a badge quietly rewriting itself is easy to
+            // miss on a screen with twenty rows.
+            el.classList.add('status-just-changed');
+            setTimeout(() => el.classList.remove('status-just-changed'), 2500);
+            changed += 1;
+            // The action buttons on the detail page depend on the status, so
+            // an in-place badge update there would leave an "Approve" button
+            // on an order that is already approved.
+            if (el.hasAttribute('data-reload-on-change')) reload = true;
+        });
+        return { changed, reload };
+    }
+
+    async function poll() {
+        // A hidden tab polling every five seconds is pure waste; the next
+        // visibilitychange fetches immediately anyway.
+        if (document.hidden) return;
+
+        const orders = orderEls();
+        const items = itemEls();
+        const params = new URLSearchParams();
+        if (orders.length) params.set('ids', idsOf(orders, 'data-order-status'));
+        if (items.length) params.set('item_ids', idsOf(items, 'data-item-status'));
+
+        try {
+            const response = await fetch(FEED + '?' + params.toString(), {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
+            // A redirect to the login page comes back as HTML, not JSON --
+            // stop polling rather than spraying errors once the session ends.
+            if (!response.ok || !(response.headers.get('content-type') || '')
+                    .includes('application/json')) {
+                throw new Error('status ' + response.status);
+            }
+            const data = await response.json();
+            failures = 0;
+
+            const a = apply(orders, 'data-order-status', data.orders || {});
+            const b = apply(items, 'data-item-status', data.items || {});
+
+            if (a.reload || b.reload) {
+                window.location.reload();
+                return;
+            }
+            if (indicator) {
+                indicator.textContent = (a.changed + b.changed)
+                    ? 'Updated just now'
+                    : 'Live';
+            }
+        } catch (e) {
+            failures += 1;
+            if (indicator) indicator.textContent = 'Reconnecting…';
+            // Back off instead of hammering a server that is already
+            // struggling, and give up rather than looping forever.
+            if (failures >= 5) {
+                clearInterval(timer);
+                if (indicator) indicator.textContent = 'Live updates paused';
+            }
+        }
+    }
+
+    // Seed each badge with what the server rendered, so the first poll only
+    // reports genuine changes instead of flashing every row on load.
+    orderEls().forEach((el) => {
+        el.dataset.currentStatus = el.dataset.statusValue || '';
+    });
+    itemEls().forEach((el) => {
+        el.dataset.currentStatus = el.dataset.statusValue || '';
+    });
+
+    timer = setInterval(poll, INTERVAL_MS);
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) poll();
+    });
+})();
+</script>
+<style>
+    .status-just-changed {
+        box-shadow: 0 0 0 2px #f59e0b;
+        transition: box-shadow .3s ease;
+    }
+</style>

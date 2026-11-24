@@ -6,6 +6,7 @@ mark_completed() for the actions so business rules aren't duplicated."""
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
@@ -14,6 +15,8 @@ from apps.accounts.models import Roles
 from apps.orders.models import Order, OrderItem
 from ..decorators import perm_required
 from ..scoping import ensure_in_scope, scope
+from ..templatetags.webadmin_extras import (item_badge_class,
+                                            order_badge_class, status_label)
 
 _svc = OrderService()
 
@@ -164,6 +167,59 @@ def order_complete_view(request, order_id):
     except ValueError as e:
         messages.error(request, str(e))
     return redirect("webadmin:order_detail", order_id=order_id)
+
+
+@perm_required("view_orders")
+def orders_status_feed_view(request):
+    """Current status of specific orders (and optionally their items), as JSON.
+
+    The orders screen polls this every few seconds. It answers only for the
+    ids the page is actually showing rather than returning everything,
+    because the alternative -- reloading the page on a timer -- throws away
+    the admin's filters, scroll position and half-typed form fields every few
+    seconds, which makes the screen unusable precisely when it is busiest.
+
+    Goes through the same perm_required and scope() as the page itself: a
+    state representative must not be able to read another state's orders just
+    because the request arrives as JSON.
+    """
+    def _ids(name, limit=400):
+        raw = (request.GET.get(name) or "").split(",")
+        seen = []
+        for part in raw:
+            part = part.strip()
+            if part.isdigit():
+                value = int(part)
+                if value not in seen:
+                    seen.append(value)
+        return seen[:limit]
+
+    order_ids = _ids("ids")
+    item_ids = _ids("item_ids")
+
+    orders = {}
+    if order_ids:
+        qs = Order.objects.filter(id__in=order_ids)
+        qs = scope(qs, request, "address__state_id")
+        for order in qs.only("id", "status"):
+            orders[str(order.id)] = {
+                "status": order.status,
+                "label": status_label(order.status),
+                "badge": order_badge_class(order.status),
+            }
+
+    items = {}
+    if item_ids:
+        iqs = OrderItem.objects.filter(id__in=item_ids)
+        iqs = scope(iqs, request, "order__address__state_id")
+        for item in iqs.only("id", "status"):
+            items[str(item.id)] = {
+                "status": item.status,
+                "label": status_label(item.status),
+                "badge": item_badge_class(item.status),
+            }
+
+    return JsonResponse({"orders": orders, "items": items})
 
 
 @perm_required("view_orders")

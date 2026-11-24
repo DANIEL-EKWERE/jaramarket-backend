@@ -69,10 +69,22 @@ def api_exception_handler(exc, context):
         detail = response.data
         message = "Request failed"
         errors = detail
+        code = None
         if isinstance(detail, dict) and "detail" in detail:
             message = str(detail["detail"])
+            # DRF carries a machine-readable code on the ErrorDetail but drops
+            # it when rendering. Pass it through: the apps need to tell
+            # "signed in on another device" apart from "session expired",
+            # because only one of them is worth explaining to the user.
+            # Two shapes reach here: DRF puts the code on the ErrorDetail,
+            # while SimpleJWT's DetailDictMixin lifts it to its own key. The
+            # explicit key wins, since the ErrorDetail's code then holds only
+            # the generic class default.
+            code = detail.get("code") or getattr(detail["detail"], "code", None)
             errors = None
         response.data = {"status": False, "message": message}
+        if code:
+            response.data["code"] = str(code)
         if errors is not None:
             response.data["errors"] = errors
     return response

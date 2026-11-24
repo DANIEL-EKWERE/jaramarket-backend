@@ -89,12 +89,17 @@ def record_expansion_interest(user, state_id=None, lga_id=None, city=None):
 
 
 # ── Catalogue visibility ────────────────────────────────────────────────────
-# Two gates, in order:
+# Three gates, in order:
 #   1. State -- outside a state we operate in, the customer sees nothing.
 #   2. LGA   -- inside an operating state, an operating LGA sees everything.
-#              A neighbouring LGA still qualifies if the customer is within
+#   3. Radius -- a neighbouring LGA still qualifies if the customer is within
 #              the visibility radius of one of our markets, because LGA
 #              borders are administrative and supply isn't.
+#
+# Coordinates are needed for gate 3 only. Without them the verdict falls back
+# to the state/LGA answer, which is what older app builds can still supply --
+# a strict coordinate requirement would blank the catalogue for every install
+# that predates the location work.
 #
 # The radius is measured to MARKETS, not to LGAs: an LGA is an area with no
 # coordinates in this schema, while a market is a real point the food
@@ -157,18 +162,33 @@ def catalogue_access(state_id=None, lga_id=None, latitude=None, longitude=None):
                 "radius_km": visibility_radius_km()}
 
     radius = visibility_radius_km()
+    has_coords = not (latitude in (None, "", "null")
+                      or longitude in (None, "", "null"))
 
-    # Gate 0 -- we need to know where they actually are. The state/LGA come
-    # from a picker the customer controls; coordinates are what the radius is
-    # measured from, so without them there is no honest answer. This is a
-    # distinct reason from "not available here": telling someone we haven't
-    # launched in their area when we simply can't see where they are would be
-    # a lie, and they'd have no way to act on it.
-    if latitude in (None, "", "null") or longitude in (None, "", "null"):
+    # Gate 0 -- we need SOME idea of where they are. Coordinates are what the
+    # radius is measured from, but a saved state/LGA is enough to answer the
+    # coarse question, so missing coordinates fall back to that rather than
+    # blanking the catalogue. Knowing neither is the only dead end: telling
+    # someone we haven't launched in their area when we cannot see where they
+    # are would be a lie, and they'd have no way to act on it.
+    if not has_coords and not state_id:
         return {"visible": False, "reason": "location_required",
                 "message": ("Turn on location so we can show you what's "
                             "available near you."),
                 "radius_km": radius}
+
+    # Coordinates but no saved address -- a new install that granted GPS
+    # before picking a delivery address. The radius alone can answer this,
+    # and it answers better than a state picker would.
+    if has_coords and not state_id:
+        market, km = nearest_operating_market(latitude, longitude)
+        if market is not None and km is not None and km <= radius:
+            return {"visible": True, "reason": "within_radius", "message": None,
+                    "radius_km": radius, "nearest_market": market.name,
+                    "distance_km": round(km, 1)}
+        return {"visible": False, "reason": "state_not_served",
+                "message": _coming_soon_message(), "radius_km": radius,
+                "distance_km": round(km, 1) if km is not None else None}
 
     # Gate 1 -- the state.
     operating_state = ServiceArea.objects.filter(
@@ -183,16 +203,26 @@ def catalogue_access(state_id=None, lga_id=None, latitude=None, longitude=None):
         return {"visible": True, "reason": "in_service_area", "message": None,
                 "radius_km": radius}
 
-    market, km = nearest_operating_market(latitude, longitude)
-    if market is not None and km is not None and km <= radius:
-        return {"visible": True, "reason": "within_radius", "message": None,
-                "radius_km": radius, "nearest_market": market.name,
-                "distance_km": round(km, 1)}
+    # Gate 3 -- the boundary allowance, which only coordinates can settle.
+    if has_coords:
+        market, km = nearest_operating_market(latitude, longitude)
+        if market is not None and km is not None and km <= radius:
+            return {"visible": True, "reason": "within_radius", "message": None,
+                    "radius_km": radius, "nearest_market": market.name,
+                    "distance_km": round(km, 1)}
+        return {"visible": False, "reason": "lga_not_served",
+                "message": _coming_soon_message(state_id, lga_id),
+                "radius_km": radius,
+                "distance_km": round(km, 1) if km is not None else None}
 
-    return {"visible": False, "reason": "lga_not_served",
-            "message": _coming_soon_message(state_id, lga_id),
-            "radius_km": radius,
-            "distance_km": round(km, 1) if km is not None else None}
+    # Operating state, non-operating LGA, no coordinates: this customer may
+    # well be inside the radius, so "we're not there yet" would be wrong.
+    # Ask for location instead -- it is the one thing that can settle it, and
+    # it keeps unprovable demand out of the expansion watchlist.
+    return {"visible": False, "reason": "location_required_for_radius",
+            "message": ("Turn on location so we can check for markets "
+                        "near you."),
+            "radius_km": radius}
 
 
 def _coming_soon_message(state_id=None, lga_id=None):

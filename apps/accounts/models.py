@@ -144,6 +144,13 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     fcm_token = models.CharField(max_length=255, null=True, blank=True)
 
+    # Identifies the one device a vendor is signed in on. Every login writes a
+    # fresh value and stamps it into the tokens, so tokens held by a previous
+    # phone stop matching and are refused. Vendors accept orders on behalf of
+    # a shop, and two phones racing the same offer queue means items accepted
+    # twice and no way to tell who actually has the goods.
+    active_session_id = models.CharField(max_length=64, null=True, blank=True)
+
     is_staff = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True, null=True)
     updated_at = models.DateTimeField(auto_now=True, null=True)

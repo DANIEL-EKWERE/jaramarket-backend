@@ -37,10 +37,28 @@ def dashboard_view(request):
             "cancelled_orders": oq.filter(status="cancelled").count(),
         })
     if user.has_perm_slug("view_transactions"):
-        rq = order_qs().filter(status="completed")
+        # Every status at or past approval, not just "completed". Filtering on
+        # that one status alone meant an order DROPPED OUT of the figure as it
+        # moved to in_transit and then received, so the number went down as
+        # business was actually concluded.
+        from api.services.order import PAID_OUT_STATUSES
+        rq = order_qs().filter(status__in=PAID_OUT_STATUSES)
         stats["total_revenue"] = rq.aggregate(s=Sum("total"))["s"] or 0
         stats["today_revenue"] = rq.filter(
             created_at__date=timezone.now().date()).aggregate(s=Sum("total"))["s"] or 0
+
+        # Commission is the one stream nobody else in the system can see: the
+        # customer pays a single price and the vendor is credited the rest.
+        ciq = (OrderItem.objects
+               .filter(order__in=rq)
+               .exclude(status="cancelled"))
+        stats["vendor_commission"] = ciq.aggregate(s=Sum("commision"))["s"] or 0
+        stats["today_vendor_commission"] = (
+            ciq.filter(order__created_at__date=timezone.now().date())
+            .aggregate(s=Sum("commision"))["s"] or 0)
+        gross = ciq.aggregate(s=Sum("amount"))["s"] or 0
+        stats["vendor_commission_rate"] = (
+            stats["vendor_commission"] / gross * 100 if gross else 0)
     if user.has_perm_slug("view_users"):
         stats["total_customers"] = _scope(User.objects.customers(), "state_id").count()
     if user.has_perm_slug("view_vendors"):

@@ -1,0 +1,127 @@
+{% comment %}
+Standalone shell for the public legal pages. Deliberately does NOT extend the
+dashboard base: that template carries a sidebar, auth-dependent context
+processors and a login redirect, none of which belong on a page a store
+reviewer opens while signed out.
+
+Everything is inline -- no build step, no CDN -- so the page cannot be broken
+by an asset host being unreachable, which on these two URLs would mean a
+rejected app submission.
+{% endcomment %}<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block doc_title %}Legal{% endblock %} — JaraMarket</title>
+<meta name="description" content="{% block doc_description %}JaraMarket legal information.{% endblock %}">
+<style>
+    :root {
+        --ink: #1e293b;
+        --muted: #64748b;
+        --rule: #e2e8f0;
+        --accent: #d97706;
+        --bg: #ffffff;
+        --card: #f8fafc;
+    }
+    @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+            --ink: #e2e8f0;
+            --muted: #94a3b8;
+            --rule: #334155;
+            --accent: #fbbf24;
+            --bg: #0f172a;
+            --card: #1e293b;
+        }
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 16px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+              Helvetica, Arial, sans-serif;
+        -webkit-text-size-adjust: 100%;
+    }
+    .wrap { max-width: 760px; margin: 0 auto; padding: 0 16px 72px; }
+    header.site {
+        border-bottom: 1px solid var(--rule);
+        margin-bottom: 32px;
+        padding: 28px 0 20px;
+    }
+    .brand {
+        font-weight: 700; font-size: 19px; letter-spacing: -0.01em;
+        color: var(--accent); text-decoration: none;
+    }
+    h1 { font-size: 28px; line-height: 1.25; margin: 18px 0 6px; letter-spacing: -0.02em; }
+    .effective { color: var(--muted); font-size: 13px; margin: 0; }
+    h2 {
+        font-size: 18px; margin: 36px 0 10px; padding-top: 4px;
+        letter-spacing: -0.01em;
+    }
+    h3 { font-size: 15px; margin: 24px 0 8px; color: var(--ink); }
+    p { margin: 0 0 14px; }
+    ul { margin: 0 0 16px; padding-left: 22px; }
+    li { margin-bottom: 6px; }
+    .lead {
+        background: var(--card); border-left: 3px solid var(--accent);
+        padding: 16px 18px; border-radius: 0 6px 6px 0; margin-bottom: 8px;
+    }
+    .contact {
+        background: var(--card); border: 1px solid var(--rule);
+        border-radius: 8px; padding: 18px 20px; margin-top: 12px;
+    }
+    .contact dt { color: var(--muted); font-size: 12px;
+                  text-transform: uppercase; letter-spacing: .05em; }
+    .contact dd { margin: 2px 0 14px; }
+    .contact dd:last-child { margin-bottom: 0; }
+    a { color: var(--accent); }
+    footer.site {
+        border-top: 1px solid var(--rule); margin-top: 48px; padding-top: 20px;
+        color: var(--muted); font-size: 13px;
+    }
+    footer.site a { margin-right: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <header class="site">
+        <a class="brand" href="/">JaraMarket</a>
+        <h1>{% block heading %}{% endblock %}</h1>
+        {% if contact.effective %}
+        <p class="effective">Effective {{ contact.effective }}</p>
+        {% endif %}
+    </header>
+
+    {% block body %}{% endblock %}
+
+    {% if show_contact %}
+    <section>
+        <h2>Contact Us</h2>
+        <p>If you have any questions or concerns about this document, please reach out:</p>
+        <dl class="contact">
+            <dt>Support</dt>
+            <dd>{{ contact.company }} Customer Support</dd>
+            {% if contact.email %}
+            <dt>Email</dt>
+            <dd><a href="mailto:{{ contact.email }}">{{ contact.email }}</a></dd>
+            {% endif %}
+            {% if contact.phone %}
+            <dt>Phone</dt>
+            <dd><a href="tel:{{ contact.phone }}">{{ contact.phone }}</a></dd>
+            {% endif %}
+            {% if contact.address %}
+            <dt>Address</dt>
+            <dd>{{ contact.address }}</dd>
+            {% endif %}
+        </dl>
+    </section>
+    {% endif %}
+
+    <footer class="site">
+        <a href="{% url 'privacy_policy' %}">Privacy Policy</a>
+        <a href="{% url 'terms_of_service' %}">Terms of Service</a>
+        <span>&copy; {{ contact.company }}</span>
+    </footer>
+</div>
+</body>
+</html>

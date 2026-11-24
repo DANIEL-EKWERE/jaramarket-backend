@@ -1,0 +1,63 @@
+{% extends "legal/_base.html" %}
+{% comment %}
+Wording kept in step with jara-user/lib/screens/legal/terms_of_service_screen.dart.
+
+NOTE for whoever maintains this: clause 1 states a flat 10% service fee, while
+the platform actually charges a BANDED commission (see finance.Commission) plus
+a separately banded service fee (finance.ServiceFeeTier). The published text and
+the code disagree. That is a commercial/legal decision, not a formatting one, so
+it has been left as published rather than quietly reworded here.
+{% endcomment %}
+{% block doc_title %}Terms of Service{% endblock %}
+{% block doc_description %}The terms that govern your use of the JaraMarket platform.{% endblock %}
+{% block heading %}Terms of Service{% endblock %}
+
+{% block body %}
+<div class="lead">
+    <p>By using our platform, you agree to these Terms of Service.</p>
+</div>
+
+<h2>1. Services</h2>
+<p>JaraMarket connects users with a selection of food recipes, sources the
+necessary ingredients, and delivers them through Ryda dispatch. We charge a
+service fee on the total purchase cost, along with an additional fee for meal
+preparation services.</p>
+
+<h2>2. User Responsibilities</h2>
+<ul>
+    <li>Please provide accurate delivery information.</li>
+    <li>Make sure you are available to receive your orders.</li>
+    <li>Payment for orders must be completed before fulfillment.</li>
+    <li>Use JaraMarket solely for personal or authorized purposes.</li>
+</ul>
+
+<h2>3. Order Processing &amp; Delivery</h2>
+<ul>
+    <li>Orders will be processed once payment is confirmed.</li>
+    <li>Delivery times may vary depending on your location and item availability.</li>
+    <li>If an item is out of stock, we may offer a replacement or a refund.</li>
+</ul>
+
+<h2>4. Cancellations &amp; Refunds</h2>
+<ul>
+    <li>Once an order is processed, it cannot be canceled.</li>
+    <li>Refunds will only be issued for items that are unavailable or in cases of
+        service failures.</li>
+</ul>
+
+<h2>5. Liability</h2>
+<p>JaraMarket is not liable for delays caused by third-party logistics or
+unforeseen events. While we aim for quality, we cannot guarantee that ingredients
+will meet specific dietary requirements.</p>
+
+<h2>6. Account Suspension</h2>
+<p>We reserve the right to suspend accounts in cases of fraud, policy violations,
+or abuse of our services.</p>
+
+<h2>7. Changes to Terms</h2>
+<p>We may revise these Terms at any time. Your continued use of JaraMarket
+indicates your acceptance of any changes.</p>
+
+<h2>8. Agreement</h2>
+<p>By using JaraMarket, you agree to these Terms.</p>
+{% endblock %}

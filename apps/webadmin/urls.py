@@ -15,6 +15,10 @@ urlpatterns = [
 
     # Orders
     path("orders", orders.orders_list_view, name="orders_list"),
+    # Polled by the orders screen for live status changes; must sit BEFORE
+    # the <int:order_id> route or "status-feed" never matches it anyway,
+    # but keep them adjacent so the pair is obvious.
+    path("orders/status-feed", orders.orders_status_feed_view, name="orders_status_feed"),
     path("orders/<int:order_id>", orders.order_detail_view, name="order_detail"),
     path("orders/<int:order_id>/cancel", orders.order_cancel_view, name="order_cancel"),
     path("orders/<int:order_id>/complete", orders.order_complete_view, name="order_complete"),
@@ -154,6 +158,11 @@ urlpatterns = [
 
     # Reports
     path("reports/orders", reports.orders_report_view, name="report_orders"),
+    # What we keep, as opposed to what passes through us.
+    path("reports/earnings", reports.earnings_report_view, name="report_earnings"),
+    # Drill-down behind the dashboard commission card.
+    path("reports/vendor-commissions", reports.vendor_commissions_view,
+         name="report_vendor_commissions"),
     path("reports/products", reports.products_report_view, name="report_products"),
     path("reports/finance-summary", reports.finance_summary_report_view, name="report_finance_summary"),
     path("reports/payments", reports.payments_report_view, name="report_payments"),

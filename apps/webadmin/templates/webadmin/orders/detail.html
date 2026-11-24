@@ -35,7 +35,9 @@
             <h2 class="text-sm font-semibold text-slate-800 mb-3">Order Info</h2>
             <dl class="space-y-2 text-sm">
                 <div class="flex justify-between"><dt class="text-slate-400">Customer</dt><dd class="text-slate-800">{{ order.user.name|default:"N/A" }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-400">Status</dt><dd><span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' or order.status == 'delivered' or order.status == 'completed' or order.status == 'in_transit' %}info{% elif order.status == 'received' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span></dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">Status
+                    <span id="status-poll-indicator" class="ml-1 text-[10px] text-slate-400">Live</span></dt>
+                    <dd><span class="{{ order.status|order_badge }}" data-order-status="{{ order.id }}" data-status-value="{{ order.status }}" data-reload-on-change>{{ order.status|status_label }}</span></dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Delivery Type</dt><dd class="text-slate-800">{{ order.delivery_type }}</dd></div>
                 <div class="flex justify-between"><dt class="text-slate-400">Date</dt><dd class="text-slate-800">{{ order.created_at }}</dd></div>
                 {% comment %}An order taken after the 18:00 cutoff sits untouched
@@ -159,7 +161,7 @@
                             {% else %}<span class="text-slate-400">—</span>{% endif %}
                         </td>
                         <td class="text-slate-500">{{ item.vendor.name|default:"Unassigned" }}</td>
-                        <td><span class="badge-{% if item.status == 'pending' %}warning{% elif item.status == 'processing' or item.status == 'delivered' %}info{% elif item.status == 'completed' %}success{% else %}danger{% endif %}">{{ item.status|title }}</span></td>
+                        <td><span class="{{ item.status|item_badge }}" data-item-status="{{ item.id }}" data-status-value="{{ item.status }}">{{ item.status|status_label }}</span></td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="8" class="text-center text-slate-400 py-12">No items on this order.</td></tr>
@@ -169,4 +171,8 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+{% include "webadmin/orders/_status_poll.html" %}
 {% endblock %}
