@@ -23,7 +23,7 @@
                 {% for c in page %}
                     <tr>
                         <td class="font-medium text-slate-800">{{ c.name }}</td>
-                        <td class="text-slate-500">{{ c.category_type.name|default:"—" }}</td>
+                        <td class="text-slate-500">{{ c.category_type.name|default:"-" }}</td>
                         <td class="text-slate-500">{{ c.sort_by }}</td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">

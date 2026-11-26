@@ -54,7 +54,7 @@
                             {% endif %}
                         </td>
                         <td class="font-medium text-slate-800">{{ p.name }}{% if links %} <span class="text-xs text-slate-400 font-normal">({{ links|length }} ingredient{{ links|length|pluralize }})</span>{% endif %}</td>
-                        <td class="font-mono">₦{{ p.price }}{% if p.discount_price %} <span class="text-slate-400 line-through text-xs">₦{{ p.discount_price }}</span>{% endif %}</td>
+                        <td class="font-mono">&#8358;{{ p.price }}{% if p.discount_price %} <span class="text-slate-400 line-through text-xs">&#8358;{{ p.discount_price }}</span>{% endif %}</td>
                         <td class="text-slate-500">{{ p.stock }}</td>
                         <td>{% for c in p.categories.all %}<span class="badge-info">{{ c.name }}</span> {% endfor %}</td>
                         <td><span class="badge-{% if p.is_active %}success{% else %}danger{% endif %}">{% if p.is_active %}Active{% else %}Inactive{% endif %}</span></td>
@@ -93,13 +93,13 @@
                                                 {% for link in links %}
                                                 <tr>
                                                     <td class="px-3 py-1.5 text-slate-700">{{ link.ingredient.name }}</td>
-                                                    <td class="px-3 py-1.5 text-slate-400 text-xs">{% if link.quantity %}{{ link.quantity }} {{ link.unit|default:link.ingredient.unit }}{% else %}—{% endif %}</td>
-                                                    <td class="px-3 py-1.5 text-right font-mono">{% if link.price is not None %}₦{{ link.price }}{% else %}<span class="text-slate-300">—</span>{% endif %}</td>
-                                                    <td class="px-3 py-1.5 text-right font-mono text-slate-400">₦{{ link.ingredient.price }}</td>
+                                                    <td class="px-3 py-1.5 text-slate-400 text-xs">{% if link.quantity %}{{ link.quantity }} {{ link.unit|default:link.ingredient.unit }}{% else %}&#8212;{% endif %}</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono">{% if link.price is not None %}&#8358;{{ link.price }}{% else %}<span class="text-slate-300">&#8212;</span>{% endif %}</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono text-slate-400">&#8358;{{ link.ingredient.price }}</td>
                                                     <td class="px-3 py-1.5 text-right text-xs">
                                                         {% with st=link.ingredient.state_prices.all lg=link.ingredient.lga_prices.all %}
-                                                        {% if st %}<span class="badge-info" title="{% for o in st %}{{ o.state.name }}: ₦{{ o.price }}{% if not forloop.last %} · {% endif %}{% endfor %}">{{ st|length }} state</span>{% endif %}
-                                                        {% if lg %}<span class="badge-warning" title="{% for o in lg %}{{ o.lga.name }}: ₦{{ o.price }}{% if not forloop.last %} · {% endif %}{% endfor %}">{{ lg|length }} LGA</span>{% endif %}
+                                                        {% if st %}<span class="badge-info" title="{% for o in st %}{{ o.state.name }}: &#8358;{{ o.price }}{% if not forloop.last %} &#183; {% endif %}{% endfor %}">{{ st|length }} state</span>{% endif %}
+                                                        {% if lg %}<span class="badge-warning" title="{% for o in lg %}{{ o.lga.name }}: &#8358;{{ o.price }}{% if not forloop.last %} &#183; {% endif %}{% endfor %}">{{ lg|length }} LGA</span>{% endif %}
                                                         {% if not st and not lg %}<span class="text-slate-300">none</span>{% endif %}
                                                         {% endwith %}
                                                     </td>
@@ -109,7 +109,7 @@
                                             <tfoot class="bg-slate-50">
                                                 <tr>
                                                     <td colspan="2" class="px-3 py-1.5 text-xs font-semibold text-slate-500">Food price</td>
-                                                    <td class="px-3 py-1.5 text-right font-mono font-semibold text-slate-800">₦{{ p.price }}</td>
+                                                    <td class="px-3 py-1.5 text-right font-mono font-semibold text-slate-800">&#8358;{{ p.price }}</td>
                                                     <td colspan="2"></td>
                                                 </tr>
                                             </tfoot>
@@ -137,7 +137,7 @@
                                                 </select>
                                                 <input type="number" step="0.01" name="state_price_price" value="{{ sp.price }}" placeholder="Price" class="text-xs">
                                                 <input type="number" step="0.01" name="state_price_discount" value="{{ sp.discount_price|default:'' }}" placeholder="Discount" class="text-xs">
-                                                <button type="button" class="remove-state-price btn-danger-soft text-xs px-2 py-1">×</button>
+                                                <button type="button" class="remove-state-price btn-danger-soft text-xs px-2 py-1">&#215;</button>
                                             </div>
                                             {% endfor %}
                                         </div>
@@ -150,10 +150,10 @@
                                                 </select>
                                                 <input type="number" step="0.01" name="state_price_price" placeholder="Price" class="text-xs">
                                                 <input type="number" step="0.01" name="state_price_discount" placeholder="Discount" class="text-xs">
-                                                <button type="button" class="remove-state-price btn-danger-soft text-xs px-2 py-1">×</button>
+                                                <button type="button" class="remove-state-price btn-danger-soft text-xs px-2 py-1">&#215;</button>
                                             </div>
                                         </template>
-                                        <p class="state-price-empty text-xs text-slate-400 mt-1 {% if p.state_prices.all %}hidden{% endif %}">No overrides — ₦{{ p.price }} applies everywhere.</p>
+                                        <p class="state-price-empty text-xs text-slate-400 mt-1 {% if p.state_prices.all %}hidden{% endif %}">No overrides &#8212; &#8358;{{ p.price }} applies everywhere.</p>
                                         <div class="flex items-center gap-2 mt-3">
                                             <button type="button" class="add-state-price btn-secondary text-xs px-3 py-1.5">+ Add state</button>
                                             <button type="submit" class="btn-primary text-xs px-3 py-1.5">Save state prices</button>
@@ -164,10 +164,10 @@
                                         {% for sp in p.state_prices.all %}
                                         <div class="flex justify-between py-0.5">
                                             <span class="text-slate-600">{{ sp.state.name }}</span>
-                                            <span class="font-mono">₦{{ sp.price }}{% if sp.discount_price %} <span class="text-slate-400 line-through text-xs">₦{{ sp.discount_price }}</span>{% endif %}</span>
+                                            <span class="font-mono">&#8358;{{ sp.price }}{% if sp.discount_price %} <span class="text-slate-400 line-through text-xs">&#8358;{{ sp.discount_price }}</span>{% endif %}</span>
                                         </div>
                                         {% empty %}
-                                        <p class="text-xs text-slate-400">No overrides — ₦{{ p.price }} applies everywhere.</p>
+                                        <p class="text-xs text-slate-400">No overrides &#8212; &#8358;{{ p.price }} applies everywhere.</p>
                                         {% endfor %}
                                     </div>
                                     {% endif %}

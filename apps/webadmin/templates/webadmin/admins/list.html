@@ -41,7 +41,7 @@
                         <td class="font-medium text-slate-800">{{ a.name }}</td>
                         <td class="text-slate-500">{{ a.email }}</td>
                         <td><span class="badge-info">{{ a.role_label }}</span></td>
-                        <td class="text-slate-500">{{ a.phone_number|default:"—" }}</td>
+                        <td class="text-slate-500">{{ a.phone_number|default:"-" }}</td>
                         <td><span class="badge-{% if a.is_active %}success{% else %}danger{% endif %}">{% if a.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">

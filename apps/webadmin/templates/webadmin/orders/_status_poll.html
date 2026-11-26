@@ -93,7 +93,7 @@ Include this inside {% block extra_scripts %} on any page whose markup has
             }
         } catch (e) {
             failures += 1;
-            if (indicator) indicator.textContent = 'Reconnecting…';
+            if (indicator) indicator.textContent = 'Reconnecting&#8230;';
             // Back off instead of hammering a server that is already
             // struggling, and give up rather than looping forever.
             if (failures >= 5) {

@@ -5,7 +5,7 @@
 <div class="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-            <h1 class="page-title">Good {{ greeting }}, {{ request.user.firstname }} 👋</h1>
+            <h1 class="page-title">Good {{ greeting }}, {{ request.user.firstname }} &#128075;</h1>
             <p class="text-sm text-slate-400 mt-0.5">{{ request.user.role }} &bull; {% now "l, d M Y" %}</p>
         </div>
         <a href="{% url 'webadmin:report_orders' %}" class="btn-secondary">
@@ -34,15 +34,16 @@
         {% if stats.total_revenue is not None %}
         <div class="card p-5">
             <div class="flex items-center justify-between mb-3">
-                {# Sum(Order.total) -- gross order value, most of which is
-                   vendor cost and VAT. Calling it "Revenue" read as income. #}
+                {% comment %}Sum(Order.total) -- gross order value, most of which
+                   is vendor cost and VAT. Calling it "Revenue" read as
+                   income.{% endcomment %}
                 <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Order Value</span>
                 <div class="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
                     <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
-            <p class="text-3xl font-bold text-slate-900">₦{{ stats.total_revenue }}</p>
-            <p class="text-xs text-slate-400 mt-2">Today: ₦{{ stats.today_revenue }}</p>
+            <p class="text-3xl font-bold text-slate-900">&#8358;{{ stats.total_revenue }}</p>
+            <p class="text-xs text-slate-400 mt-2">Today: &#8358;{{ stats.today_revenue }}</p>
             {% if request.user|has_perm_slug:"view_reports" %}
             <a href="{% url 'webadmin:report_earnings' %}" class="text-[11px] text-violet-600 underline mt-1 inline-block">What we actually earn &rarr;</a>
             {% endif %}
@@ -56,10 +57,11 @@
                     <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z"/></svg>
                 </div>
             </div>
-            <p class="text-3xl font-bold text-emerald-700">₦{{ stats.vendor_commission|floatformat:2 }}</p>
-            {# Say "all time": the drill-down opens on the last 30 days, so
-               without this the two figures look like they disagree. #}
-            <p class="text-xs text-slate-400 mt-2">All time · today ₦{{ stats.today_vendor_commission|floatformat:2 }} · {{ stats.vendor_commission_rate|floatformat:2 }}% avg</p>
+            <p class="text-3xl font-bold text-emerald-700">&#8358;{{ stats.vendor_commission|floatformat:2 }}</p>
+            {% comment %}Say "all time": the drill-down opens on the last 30
+               days, so without this the two figures look like they
+               disagree.{% endcomment %}
+            <p class="text-xs text-slate-400 mt-2">All time &#183; today &#8358;{{ stats.today_vendor_commission|floatformat:2 }} &#183; {{ stats.vendor_commission_rate|floatformat:2 }}% avg</p>
             <span class="text-[11px] text-emerald-600 underline mt-1 inline-block">See it by vendor &rarr;</span>
         </a>
         {% endif %}
@@ -108,7 +110,7 @@
                         </div>
                     </div>
                     <div class="text-right">
-                        <p class="text-sm font-semibold text-slate-900">₦{{ order.total }}</p>
+                        <p class="text-sm font-semibold text-slate-900">&#8358;{{ order.total }}</p>
                         <span class="badge-{% if order.status == 'pending' %}warning{% elif order.status == 'processing' %}info{% elif order.status == 'completed' %}success{% else %}danger{% endif %}">{{ order.status|title }}</span>
                     </div>
                 </div>

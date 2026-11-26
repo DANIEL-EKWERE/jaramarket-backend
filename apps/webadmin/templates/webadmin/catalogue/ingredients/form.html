@@ -22,8 +22,8 @@
             <div><label>Name <span class="text-red-500">*</span></label><input type="text" name="name" value="{{ ingredient.name|default:'' }}" required></div>
             <div><label>Description</label><textarea name="description" rows="3">{{ ingredient.description|default:'' }}</textarea></div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label>Price (₦)</label><input type="number" step="0.01" name="price" value="{{ ingredient.price|default:0 }}"></div>
-                <div><label>Discounted Price (₦)</label><input type="number" step="0.01" name="discounted_price" value="{{ ingredient.discounted_price|default:'' }}"></div>
+                <div><label>Price (&#8358;)</label><input type="number" step="0.01" name="price" value="{{ ingredient.price|default:0 }}"></div>
+                <div><label>Discounted Price (&#8358;)</label><input type="number" step="0.01" name="discounted_price" value="{{ ingredient.discounted_price|default:'' }}"></div>
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <div><label>Unit</label><input type="text" name="unit" value="{{ ingredient.unit|default:'' }}" placeholder="kg, pcs, etc."></div>
@@ -32,7 +32,7 @@
             <div>
                 <label>Category</label>
                 <select name="category_id">
-                    <option value="">—</option>
+                    <option value="">&#8212;</option>
                     {% for c in categories %}
                     <option value="{{ c.id }}" {% if ingredient.category_id == c.id %}selected{% endif %}>{{ c.name }}</option>
                     {% endfor %}

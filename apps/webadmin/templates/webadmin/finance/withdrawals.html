@@ -29,9 +29,9 @@
                 {% for t in page %}
                     <tr>
                         <td class="font-mono text-xs text-slate-500">{{ t.reference }}</td>
-                        <td>{% if t.owner %}<span class="font-medium text-slate-800">{{ t.owner.name }}</span><br><span class="text-slate-400 text-xs">{{ t.owner.email }}</span>{% else %}—{% endif %}</td>
-                        <td class="font-mono">₦{{ t.amount_naira }}</td>
-                        <td class="text-slate-500">{{ t.bank_name }} — {{ t.account_number }}</td>
+                        <td>{% if t.owner %}<span class="font-medium text-slate-800">{{ t.owner.name }}</span><br><span class="text-slate-400 text-xs">{{ t.owner.email }}</span>{% else %}&#8212;{% endif %}</td>
+                        <td class="font-mono">&#8358;{{ t.amount_naira }}</td>
+                        <td class="text-slate-500">{{ t.bank_name }} &#8212; {{ t.account_number }}</td>
                         <td><span class="badge-{% if t.status == 'success' %}success{% elif t.status == 'failed' %}danger{% else %}warning{% endif %}">{{ t.status|default:"pending" }}</span></td>
                         <td class="text-slate-400 text-xs">{{ t.created_at }}</td>
                     </tr>

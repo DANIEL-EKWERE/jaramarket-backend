@@ -18,7 +18,7 @@
             <div><label>Site Name</label><input type="text" name="site_name" value="{{ s.site_name|default:'' }}"></div>
             <div><label>Site Description</label><textarea name="site_description" rows="2">{{ s.site_description|default:'' }}</textarea></div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label>Currency</label><input type="text" name="currency" value="{{ s.currency|default:'₦' }}"></div>
+                <div><label>Currency</label><input type="text" name="currency" value="{% if s.currency %}{{ s.currency }}{% else %}&#8358;{% endif %}"></div>
                 <div><label>Timezone</label><input type="text" name="timezone" value="{{ s.timezone|default:'' }}" placeholder="Africa/Lagos"></div>
             </div>
             <div class="grid grid-cols-2 gap-4">

@@ -56,7 +56,7 @@
                             {% endif %}
                         </td>
                         <td class="text-slate-500 text-xs" style="max-width:260px">
-                            <div class="text-slate-600">{{ order.address.contact_address|default:"—" }}</div>
+                            <div class="text-slate-600">{{ order.address.contact_address|default:"-" }}</div>
                             {% if order.address.lga or order.address.state %}
                             <div class="text-slate-400 mt-0.5">
                                 {{ order.address.lga.name|default:"" }}{% if order.address.lga and order.address.state %}, {% endif %}{{ order.address.state.name|default:"" }}

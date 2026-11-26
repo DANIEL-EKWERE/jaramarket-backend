@@ -38,7 +38,7 @@
                     <tr>
                         <td class="font-medium text-slate-800">{{ v.name }}</td>
                         <td>{{ v.email }}<br><span class="text-slate-400 text-xs">{{ v.phone_number }}</span></td>
-                        <td class="text-slate-500">{{ v.state.name|default:"—" }}</td>
+                        <td class="text-slate-500">{{ v.state.name|default:"-" }}</td>
                         <td>{% if v.market %}{{ v.market.name }}{% else %}<span class="badge-danger">Not set</span>{% endif %}</td>
                         <td>{% for c in v.categories.all %}<span class="badge-info">{{ c.name }}</span> {% empty %}<span class="badge-danger">None</span>{% endfor %}</td>
                         <td>
@@ -49,7 +49,7 @@
                             <span class="badge-success">Yes</span>
                             {% endif %}
                         </td>
-                        <td class="font-mono">₦{{ v.wallet_balance }}</td>
+                        <td class="font-mono">&#8358;{{ v.wallet_balance }}</td>
                         <td><span class="badge-{% if v.is_active %}success{% else %}danger{% endif %}">{% if v.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right"><a href="{% url 'webadmin:vendor_detail' v.id %}" class="btn-edit">View</a></td>
                     </tr>

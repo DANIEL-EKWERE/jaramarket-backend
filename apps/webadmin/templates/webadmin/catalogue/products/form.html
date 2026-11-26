@@ -22,8 +22,8 @@
             <div><label>Name <span class="text-red-500">*</span></label><input type="text" name="name" value="{{ product.name|default:'' }}" required></div>
             <div><label>Description</label><textarea name="description" rows="3">{{ product.description|default:'' }}</textarea></div>
             <div class="grid grid-cols-2 gap-4">
-                <div><label>Price (₦)</label><input type="number" step="0.01" name="price" id="product-price-input" value="{{ product.price|default:0 }}"></div>
-                <div><label>Discount Price (₦)</label><input type="number" step="0.01" name="discount_price" value="{{ product.discount_price|default:'' }}"></div>
+                <div><label>Price (&#8358;)</label><input type="number" step="0.01" name="price" id="product-price-input" value="{{ product.price|default:0 }}"></div>
+                <div><label>Discount Price (&#8358;)</label><input type="number" step="0.01" name="discount_price" value="{{ product.discount_price|default:'' }}"></div>
             </div>
             <p id="price-auto-hint" class="text-xs text-slate-400 -mt-2 hidden">Auto-calculated as the sum of the linked ingredients' prices below.</p>
             <div><label>Stock</label><input type="number" name="stock" value="{{ product.stock|default:0 }}"></div>
@@ -36,7 +36,7 @@
                 <input type="url" name="youtube_url" id="youtube-url-input"
                        placeholder="https://www.youtube.com/watch?v=..."
                        value="{{ product.youtube_url|default:'' }}">
-                <p class="text-xs text-slate-400 mt-1">Optional. Shown as the “Watch Video” button in the app. Paste any YouTube link — watch, youtu.be, Shorts or embed.</p>
+                <p class="text-xs text-slate-400 mt-1">Optional. Shown as the &#8220;Watch Video&#8221; button in the app. Paste any YouTube link &#8212; watch, youtu.be, Shorts or embed.</p>
                 <div id="youtube-preview" class="mt-3 hidden">
                     <div class="aspect-video w-full max-w-md rounded-lg overflow-hidden border border-slate-200 bg-slate-900">
                         <iframe id="youtube-frame" class="w-full h-full" src="" title="Recipe video preview"
@@ -44,7 +44,7 @@
                                 referrerpolicy="strict-origin-when-cross-origin"></iframe>
                     </div>
                 </div>
-                <p id="youtube-error" class="text-xs text-red-500 mt-1 hidden">That doesn’t look like a YouTube link.</p>
+                <p id="youtube-error" class="text-xs text-red-500 mt-1 hidden">That doesn&#8217;t look like a YouTube link.</p>
             </div>
             <div>
                 <label>Product Image</label>
@@ -130,7 +130,7 @@
                                 <option value="{{ u.code }}" {% if u.code == link.unit %}selected{% endif %}>{{ u.name }}</option>
                                 {% endfor %}
                             </select>
-                            <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" value="{{ link.price|default_if_none:link.ingredient.price }}" placeholder="Price (₦)">
+                            <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" value="{{ link.price|default_if_none:link.ingredient.price }}" placeholder="Price (&#8358;)">
                             <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
                         </div>
 
@@ -146,7 +146,7 @@
                                 <span class="text-slate-400">({{ link.ingredient.state_prices.all|length }} state, {{ link.ingredient.lga_prices.all|length }} LGA)</span>
                             </button>
                             <div id="ing-states-{{ link.ingredient_id }}" class="ing-state-panel hidden mt-2 bg-white border border-slate-200 rounded-lg p-2">
-                                <p class="text-xs text-amber-600 mb-2">These belong to the ingredient itself — changing them affects every food that uses {{ link.ingredient.name }}, not just this one.</p>
+                                <p class="text-xs text-amber-600 mb-2">These belong to the ingredient itself &#8212; changing them affects every food that uses {{ link.ingredient.name }}, not just this one.</p>
                                 <div class="ing-state-rows space-y-2" data-ingredient="{{ link.ingredient_id }}">
                                     {% for sp in link.ingredient.state_prices.all %}
                                     <div class="ing-state-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
@@ -158,16 +158,16 @@
                                         </select>
                                         <input type="number" step="0.01" name="ing_state_price" value="{{ sp.price }}" placeholder="Price" class="text-xs">
                                         <input type="number" step="0.01" name="ing_state_discount" value="{{ sp.discounted_price|default:'' }}" placeholder="Discount" class="text-xs">
-                                        <button type="button" class="remove-ing-state btn-danger-soft text-xs px-2 py-1">×</button>
+                                        <button type="button" class="remove-ing-state btn-danger-soft text-xs px-2 py-1">&#215;</button>
                                     </div>
                                     {% endfor %}
                                 </div>
-                                <p class="ing-state-empty text-xs text-slate-400 mt-1 {% if link.ingredient.state_prices.all %}hidden{% endif %}">No state overrides — ₦{{ link.ingredient.price }} applies everywhere.</p>
+                                <p class="ing-state-empty text-xs text-slate-400 mt-1 {% if link.ingredient.state_prices.all %}hidden{% endif %}">No state overrides &#8212; &#8358;{{ link.ingredient.price }} applies everywhere.</p>
                                 <button type="button" class="add-ing-state btn-secondary text-xs px-3 py-1.5 mt-2"
                                         data-ingredient="{{ link.ingredient_id }}">+ Add state</button>
 
                                 <div class="border-t border-slate-100 mt-3 pt-3">
-                                    <p class="text-xs font-semibold text-slate-500 mb-2">LGA prices <span class="font-normal text-slate-400">— take priority over the state price</span></p>
+                                    <p class="text-xs font-semibold text-slate-500 mb-2">LGA prices <span class="font-normal text-slate-400">&#8212; take priority over the state price</span></p>
                                     <div class="ing-lga-rows space-y-2" data-ingredient="{{ link.ingredient_id }}">
                                         {% for lp in link.ingredient.lga_prices.all %}
                                         <div class="ing-lga-row grid grid-cols-[1.4fr_1fr_1fr_auto] gap-2 items-center">
@@ -184,11 +184,11 @@
                                             </select>
                                             <input type="number" step="0.01" name="ing_lga_price" value="{{ lp.price }}" placeholder="Price" class="text-xs">
                                             <input type="number" step="0.01" name="ing_lga_discount" value="{{ lp.discounted_price|default:'' }}" placeholder="Discount" class="text-xs">
-                                            <button type="button" class="remove-ing-lga btn-danger-soft text-xs px-2 py-1">×</button>
+                                            <button type="button" class="remove-ing-lga btn-danger-soft text-xs px-2 py-1">&#215;</button>
                                         </div>
                                         {% endfor %}
                                     </div>
-                                    <p class="ing-lga-empty text-xs text-slate-400 mt-1 {% if link.ingredient.lga_prices.all %}hidden{% endif %}">No LGA overrides — the state or default price applies.</p>
+                                    <p class="ing-lga-empty text-xs text-slate-400 mt-1 {% if link.ingredient.lga_prices.all %}hidden{% endif %}">No LGA overrides &#8212; the state or default price applies.</p>
                                     <button type="button" class="add-ing-lga btn-secondary text-xs px-3 py-1.5 mt-2"
                                             data-ingredient="{{ link.ingredient_id }}">+ Add LGA</button>
                                 </div>
@@ -214,7 +214,7 @@
                             </select>
                             <input type="number" step="0.01" name="ing_lga_price" placeholder="Price" class="text-xs">
                             <input type="number" step="0.01" name="ing_lga_discount" placeholder="Discount" class="text-xs">
-                            <button type="button" class="remove-ing-lga btn-danger-soft text-xs px-2 py-1">×</button>
+                            <button type="button" class="remove-ing-lga btn-danger-soft text-xs px-2 py-1">&#215;</button>
                         </div>
                     </template>
                     <template id="ing-state-row-tpl">
@@ -227,7 +227,7 @@
                             </select>
                             <input type="number" step="0.01" name="ing_state_price" placeholder="Price" class="text-xs">
                             <input type="number" step="0.01" name="ing_state_discount" placeholder="Discount" class="text-xs">
-                            <button type="button" class="remove-ing-state btn-danger-soft text-xs px-2 py-1">×</button>
+                            <button type="button" class="remove-ing-state btn-danger-soft text-xs px-2 py-1">&#215;</button>
                         </div>
                     </template>
                 </div>
@@ -248,7 +248,7 @@
                             <option value="{{ u.code }}">{{ u.name }}</option>
                             {% endfor %}
                         </select>
-                        <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" placeholder="Price (₦)">
+                        <input type="number" step="0.01" name="ingredient_price" class="ingredient-price" placeholder="Price (&#8358;)">
                         <button type="button" class="remove-ingredient-row btn-danger-soft text-xs px-2 py-1">Remove</button>
                     </div>
                 </template>

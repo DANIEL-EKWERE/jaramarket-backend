@@ -18,8 +18,8 @@
     <div class="card p-6 max-w-lg">
         <form method="post" class="space-y-4">
             {% csrf_token %}
-            <div><label>Min Amount (₦)</label><input type="number" step="0.01" name="min_amount" value="{{ commission.min_amount|default:0 }}"></div>
-            <div><label>Max Amount (₦) <span class="text-slate-400 font-normal">(blank = no limit)</span></label><input type="number" step="0.01" name="max_amount" value="{{ commission.max_amount|default:'' }}"></div>
+            <div><label>Min Amount (&#8358;)</label><input type="number" step="0.01" name="min_amount" value="{{ commission.min_amount|default:0 }}"></div>
+            <div><label>Max Amount (&#8358;) <span class="text-slate-400 font-normal">(blank = no limit)</span></label><input type="number" step="0.01" name="max_amount" value="{{ commission.max_amount|default:'' }}"></div>
             <div><label>Commission Rate (%) <span class="text-red-500">*</span></label><input type="number" step="0.01" name="percentage" value="{{ commission.percentage|default:'' }}" required></div>
             <div class="flex gap-2 pt-2">
                 <button type="submit" class="btn-primary">Save Tier</button>

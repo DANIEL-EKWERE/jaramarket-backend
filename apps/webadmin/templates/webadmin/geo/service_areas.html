@@ -5,7 +5,7 @@
     <div class="w-full px-6 lg:px-8 py-4">
         <div class="breadcrumb"><span>Coverage</span><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg><span class="text-slate-600 font-medium">Service Areas</span></div>
         <h1 class="page-title">Service Areas</h1>
-        <p class="text-xs text-slate-400 mt-1">Where customers are allowed to place orders. Anywhere not listed is turned away — and recorded on the expansion watchlist.</p>
+        <p class="text-xs text-slate-400 mt-1">Where customers are allowed to place orders. Anywhere not listed is turned away &#8212; and recorded on the expansion watchlist.</p>
     </div>
 </div>
 
@@ -60,7 +60,7 @@
                     <option value="{{ l.id }}" data-state="{{ l.state_id }}">{{ l.name }}</option>
                     {% endfor %}
                 </select>
-                <p class="text-xs text-slate-400 mt-1">Leave as “Whole state” to cover every LGA.</p>
+                <p class="text-xs text-slate-400 mt-1">Leave as &#8220;Whole state&#8221; to cover every LGA.</p>
             </div>
             <div>
                 <label>Note <span class="text-slate-400 font-normal">(optional)</span></label>
@@ -79,7 +79,7 @@
                     <tr>
                         <td class="font-medium text-slate-800">{{ a.state.name }}</td>
                         <td>{% if a.lga %}{{ a.lga.name }}{% else %}<span class="badge-info">Whole state</span>{% endif %}</td>
-                        <td class="text-slate-500 text-xs">{{ a.note|default:"—" }}</td>
+                        <td class="text-slate-500 text-xs">{{ a.note|default:"-" }}</td>
                         <td><span class="badge-{% if a.is_active %}success{% else %}warning{% endif %}">{% if a.is_active %}Active{% else %}Paused{% endif %}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
@@ -93,7 +93,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="5" class="text-center text-slate-400 py-12">No service areas yet — ordering is open everywhere.</td></tr>
+                    <tr><td colspan="5" class="text-center text-slate-400 py-12">No service areas yet &#8212; ordering is open everywhere.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
@@ -102,7 +102,7 @@
 
     {% if watchlist_count %}
     <p class="text-sm text-slate-500">
-        <a href="{% url 'webadmin:expansion_watchlist' %}" class="text-emerald-600 hover:underline font-medium">{{ watchlist_count }} location{{ watchlist_count|pluralize }} on the expansion watchlist</a> — customers who tried to order from somewhere you don't cover.
+        <a href="{% url 'webadmin:expansion_watchlist' %}" class="text-emerald-600 hover:underline font-medium">{{ watchlist_count }} location{{ watchlist_count|pluralize }} on the expansion watchlist</a> &#8212; customers who tried to order from somewhere you don't cover.
     </p>
     {% endif %}
 </div>

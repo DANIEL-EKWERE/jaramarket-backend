@@ -25,16 +25,16 @@
         <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Orders</p><p class="text-2xl font-bold text-slate-900 mt-1.5">{{ stats.total_orders }}</p></div>
         <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending</p><p class="text-2xl font-bold text-amber-600 mt-1.5">{{ stats.pending_orders }}</p></div>
         <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Completed</p><p class="text-2xl font-bold text-emerald-600 mt-1.5">{{ stats.completed_orders }}</p></div>
-        <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Earned</p><p class="text-2xl font-bold text-slate-900 mt-1.5">₦{{ stats.total_earned }}</p></div>
+        <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Earned</p><p class="text-2xl font-bold text-slate-900 mt-1.5">&#8358;{{ stats.total_earned }}</p></div>
     </div>
 
     <div class="card p-6">
         <dl class="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
             <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Email</dt><dd class="text-slate-800">{{ vendor.email }}</dd></div>
-            <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Phone</dt><dd class="text-slate-800">{{ vendor.phone_number|default:"—" }}</dd></div>
-            <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">State</dt><dd class="text-slate-800">{{ vendor.state.name|default:"—" }}</dd></div>
-            <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Wallet Balance</dt><dd class="text-slate-800 font-mono">₦{{ wallet_balance }}</dd></div>
-            <div class="sm:col-span-2"><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Categories</dt><dd>{% for c in categories %}<span class="badge-info">{{ c.name }}</span> {% empty %}—{% endfor %}</dd></div>
+            <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Phone</dt><dd class="text-slate-800">{{ vendor.phone_number|default:"-" }}</dd></div>
+            <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">State</dt><dd class="text-slate-800">{{ vendor.state.name|default:"-" }}</dd></div>
+            <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Wallet Balance</dt><dd class="text-slate-800 font-mono">&#8358;{{ wallet_balance }}</dd></div>
+            <div class="sm:col-span-2"><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Categories</dt><dd>{% for c in categories %}<span class="badge-info">{{ c.name }}</span> {% empty %}&#8212;{% endfor %}</dd></div>
             <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Status</dt><dd><span class="badge-{% if vendor.is_active %}success{% else %}danger{% endif %}">{% if vendor.is_active %}Active{% else %}Inactive{% endif %}</span></dd></div>
             <div><dt class="text-slate-400 text-xs uppercase font-semibold tracking-wider mb-1">Verification</dt><dd><span class="badge-{% if vendor.is_verified %}success{% else %}warning{% endif %}">{% if vendor.is_verified %}Verified{% else %}Unverified{% endif %}</span></dd></div>
         </dl>

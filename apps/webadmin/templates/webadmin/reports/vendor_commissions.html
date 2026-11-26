@@ -24,7 +24,7 @@
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div class="card p-5 border-l-4 border-emerald-500">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Commission earned</p>
-            <p class="text-2xl font-bold text-emerald-700 mt-1.5">₦{{ totals.commission|floatformat:2 }}</p>
+            <p class="text-2xl font-bold text-emerald-700 mt-1.5">&#8358;{{ totals.commission|floatformat:2 }}</p>
         </div>
         <div class="card p-5">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Effective rate</p>
@@ -33,19 +33,19 @@
         </div>
         <div class="card p-5">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Paid to vendors</p>
-            <p class="text-2xl font-bold text-slate-900 mt-1.5">₦{{ totals.paid_out|floatformat:2 }}</p>
+            <p class="text-2xl font-bold text-slate-900 mt-1.5">&#8358;{{ totals.paid_out|floatformat:2 }}</p>
         </div>
         <div class="card p-5">
             <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Lines sourced</p>
             <p class="text-2xl font-bold text-slate-900 mt-1.5">{{ totals.lines }}</p>
-            <p class="text-[11px] text-slate-400 mt-1">₦{{ totals.gross|floatformat:2 }} gross</p>
+            <p class="text-[11px] text-slate-400 mt-1">&#8358;{{ totals.gross|floatformat:2 }} gross</p>
         </div>
     </div>
 
     <div class="card overflow-hidden">
         <div class="px-6 py-4 border-b border-slate-100 bg-slate-50/60">
             <h2 class="text-sm font-semibold text-slate-800">By vendor</h2>
-            <p class="text-[11px] text-slate-500 mt-0.5">Highest earner first. The rate is each vendor's own blend — one shifting many small lines pays a higher rate than one shifting a single large line.</p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Highest earner first. The rate is each vendor's own blend &#8212; one shifting many small lines pays a higher rate than one shifting a single large line.</p>
         </div>
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
@@ -59,10 +59,10 @@
                         <td class="font-medium text-slate-800">{{ row.name }}
                             <span class="block text-[11px] text-slate-400">{{ row.vendor__email }}</span></td>
                         <td>{{ row.lines }}</td>
-                        <td class="font-mono text-slate-500">₦{{ row.gross|floatformat:2 }}</td>
-                        <td class="font-mono text-slate-500">₦{{ row.paid_out|floatformat:2 }}</td>
+                        <td class="font-mono text-slate-500">&#8358;{{ row.gross|floatformat:2 }}</td>
+                        <td class="font-mono text-slate-500">&#8358;{{ row.paid_out|floatformat:2 }}</td>
                         <td><span class="badge-info">{{ row.rate|floatformat:2 }}%</span></td>
-                        <td class="font-mono text-right font-semibold text-emerald-700">₦{{ row.commission|floatformat:2 }}</td>
+                        <td class="font-mono text-right font-semibold text-emerald-700">&#8358;{{ row.commission|floatformat:2 }}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="6" class="text-center text-slate-400 py-12">No commission earned in this range.</td></tr>
@@ -73,10 +73,10 @@
                     <tr>
                         <td class="font-semibold text-slate-900">Total</td>
                         <td class="font-semibold">{{ totals.lines }}</td>
-                        <td class="font-mono font-semibold">₦{{ totals.gross|floatformat:2 }}</td>
-                        <td class="font-mono font-semibold">₦{{ totals.paid_out|floatformat:2 }}</td>
+                        <td class="font-mono font-semibold">&#8358;{{ totals.gross|floatformat:2 }}</td>
+                        <td class="font-mono font-semibold">&#8358;{{ totals.paid_out|floatformat:2 }}</td>
                         <td class="font-semibold">{{ totals.rate|floatformat:2 }}%</td>
-                        <td class="font-mono text-right font-bold text-emerald-700">₦{{ totals.commission|floatformat:2 }}</td>
+                        <td class="font-mono text-right font-bold text-emerald-700">&#8358;{{ totals.commission|floatformat:2 }}</td>
                     </tr>
                 </tfoot>
                 {% endif %}
@@ -99,8 +99,8 @@
                             {% if band.note %}<span class="block text-[11px] text-amber-600">{{ band.note }}</span>{% endif %}</td>
                         <td><span class="badge-info">{{ band.percentage|floatformat:2 }}%</span></td>
                         <td>{{ band.lines }}</td>
-                        <td class="font-mono text-slate-500">₦{{ band.gross|floatformat:2 }}</td>
-                        <td class="font-mono text-right font-semibold">₦{{ band.commission|floatformat:2 }}</td>
+                        <td class="font-mono text-slate-500">&#8358;{{ band.gross|floatformat:2 }}</td>
+                        <td class="font-mono text-right font-semibold">&#8358;{{ band.commission|floatformat:2 }}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="5" class="text-center text-slate-400 py-12">No commission bands configured.</td></tr>

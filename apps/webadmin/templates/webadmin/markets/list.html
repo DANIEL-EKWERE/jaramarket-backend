@@ -23,7 +23,7 @@
                 {% for m in page %}
                     <tr>
                         <td class="font-medium text-slate-800">{{ m.name }}</td>
-                        <td class="text-slate-500">{{ m.state.name|default:"—" }} / {{ m.lga.name|default:"—" }}</td>
+                        <td class="text-slate-500">{{ m.state.name|default:"-" }} / {{ m.lga.name|default:"-" }}</td>
                         <td class="text-slate-500">{{ m.latitude }}, {{ m.longitude }}</td>
                         <td><span class="badge-{% if m.is_active %}success{% else %}danger{% endif %}">{% if m.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right">

@@ -18,12 +18,12 @@
     <div class="card p-6 max-w-lg">
         <form method="post" class="space-y-4">
             {% csrf_token %}
-            <div><label>Min Amount (₦)</label><input type="number" step="0.01" name="min_amount" value="{{ tier.min_amount|default:0 }}"></div>
-            <div><label>Max Amount (₦) <span class="text-slate-400 font-normal">(blank = no limit, top tier)</span></label><input type="number" step="0.01" name="max_amount" value="{{ tier.max_amount|default:'' }}"></div>
+            <div><label>Min Amount (&#8358;)</label><input type="number" step="0.01" name="min_amount" value="{{ tier.min_amount|default:0 }}"></div>
+            <div><label>Max Amount (&#8358;) <span class="text-slate-400 font-normal">(blank = no limit, top tier)</span></label><input type="number" step="0.01" name="max_amount" value="{{ tier.max_amount|default:'' }}"></div>
             <div>
                 <label>Fee Type</label>
                 <select name="fee_type">
-                    <option value="flat" {% if tier.fee_type == "flat" %}selected{% endif %}>Flat (₦)</option>
+                    <option value="flat" {% if tier.fee_type == "flat" %}selected{% endif %}>Flat (&#8358;)</option>
                     <option value="percentage" {% if tier.fee_type == "percentage" or not tier %}selected{% endif %}>Percentage (%)</option>
                 </select>
             </div>

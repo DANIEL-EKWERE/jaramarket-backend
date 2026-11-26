@@ -57,8 +57,8 @@
                             {% endif %}
                         </td>
                         <td class="font-medium text-slate-800">{{ i.name }}</td>
-                        <td class="text-slate-500">{% if i.category %}{{ i.category.name }}{% else %}<span class="badge-danger" title="Vendors are matched by category — without one this item can never reach a vendor">Not set</span>{% endif %}</td>
-                        <td class="font-mono">₦{{ i.price }}{% if i.discounted_price %} <span class="text-slate-400 line-through text-xs">₦{{ i.discounted_price }}</span>{% endif %}</td>
+                        <td class="text-slate-500">{% if i.category %}{{ i.category.name }}{% else %}<span class="badge-danger" title="Vendors are matched by category &#8212; without one this item can never reach a vendor">Not set</span>{% endif %}</td>
+                        <td class="font-mono">&#8358;{{ i.price }}{% if i.discounted_price %} <span class="text-slate-400 line-through text-xs">&#8358;{{ i.discounted_price }}</span>{% endif %}</td>
                         <td class="text-slate-500">{{ i.unit }}</td>
                         <td class="text-slate-500">{{ i.stock }}</td>
                         <td><span class="badge-{% if i.is_active %}success{% else %}danger{% endif %}">{% if i.is_active %}Active{% else %}Inactive{% endif %}</span></td>

@@ -24,7 +24,7 @@
                     <tr>
                         <td class="font-medium text-slate-800">{{ f.name }}</td>
                         <td class="text-slate-500">{{ f.location }}</td>
-                        <td class="text-slate-500">{{ f.owner.name|default:"—" }}</td>
+                        <td class="text-slate-500">{{ f.owner.name|default:"-" }}</td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{% url 'webadmin:franchise_update' f.id %}" class="btn-edit">Edit</a>

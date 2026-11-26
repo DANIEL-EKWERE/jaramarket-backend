@@ -33,7 +33,7 @@
                             {% endif %}
                         </td>
                         <td class="text-slate-500">{{ ad.type }}</td>
-                        <td class="text-slate-800">{{ ad.value|default:"—" }}</td>
+                        <td class="text-slate-800">{{ ad.value|default:"-" }}</td>
                         <td><span class="badge-{% if ad.status == 'active' %}success{% else %}danger{% endif %}">{{ ad.status }}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">

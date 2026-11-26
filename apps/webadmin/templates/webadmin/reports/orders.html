@@ -21,7 +21,7 @@
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Orders</p><p class="text-2xl font-bold text-slate-900 mt-1.5">{{ total_orders }}</p></div>
-        <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gross Order Value</p><p class="text-2xl font-bold text-slate-900 mt-1.5">₦{{ total_revenue }}</p><p class="text-[11px] text-slate-400 mt-1">Everything customers paid, including vendor cost and VAT. For income see <a class="underline" href="{% url 'webadmin:report_earnings' %}">Earnings</a>.</p></div>
+        <div class="card p-5"><p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Gross Order Value</p><p class="text-2xl font-bold text-slate-900 mt-1.5">&#8358;{{ total_revenue }}</p><p class="text-[11px] text-slate-400 mt-1">Everything customers paid, including vendor cost and VAT. For income see <a class="underline" href="{% url 'webadmin:report_earnings' %}">Earnings</a>.</p></div>
     </div>
 
     <div class="card overflow-hidden">
@@ -31,7 +31,7 @@
                 <thead><tr><th>Status</th><th>Count</th><th>Total</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for row in by_status %}
-                    <tr><td class="text-slate-700">{{ row.status|title }}</td><td>{{ row.c }}</td><td class="font-mono">₦{{ row.t }}</td></tr>
+                    <tr><td class="text-slate-700">{{ row.status|title }}</td><td>{{ row.c }}</td><td class="font-mono">&#8358;{{ row.t }}</td></tr>
                 {% empty %}
                     <tr><td colspan="3" class="text-center text-slate-400 py-12">No data for this range.</td></tr>
                 {% endfor %}
@@ -47,7 +47,7 @@
                 <thead><tr><th>Date</th><th>Orders</th><th>Revenue</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for row in daily %}
-                    <tr><td class="text-slate-700">{{ row.created_at__date }}</td><td>{{ row.count }}</td><td class="font-mono">₦{{ row.revenue }}</td></tr>
+                    <tr><td class="text-slate-700">{{ row.created_at__date }}</td><td>{{ row.count }}</td><td class="font-mono">&#8358;{{ row.revenue }}</td></tr>
                 {% empty %}
                     <tr><td colspan="3" class="text-center text-slate-400 py-12">No data for this range.</td></tr>
                 {% endfor %}

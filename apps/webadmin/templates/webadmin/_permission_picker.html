@@ -5,7 +5,7 @@
             <p class="text-xs text-slate-400">
                 Leave everything unticked and this account simply follows its role.
                 Tick anything and that exact set is used instead.
-                <span class="inline-block px-1.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">•</span>
+                <span class="inline-block px-1.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">&#8226;</span>
                 marks what the role grants on its own.
             </p>
         </div>
@@ -28,7 +28,7 @@
                            style="width:auto">
                     <span>{{ perm.name }}</span>
                     {% if perm.is_default %}
-                    <span class="text-emerald-600" title="Granted by this role">•</span>
+                    <span class="text-emerald-600" title="Granted by this role">&#8226;</span>
                     {% endif %}
                 </label>
                 {% endfor %}

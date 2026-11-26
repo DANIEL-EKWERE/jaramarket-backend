@@ -46,7 +46,7 @@
                 {% if order.scheduled_dispatch_at %}
                 <div class="flex justify-between gap-3">
                     <dt class="text-slate-400 shrink-0">Dispatch</dt>
-                    <dd class="text-right"><span class="badge-warning">Paused — resumes {{ order.scheduled_dispatch_at }}</span></dd>
+                    <dd class="text-right"><span class="badge-warning">Paused &#8212; resumes {{ order.scheduled_dispatch_at }}</span></dd>
                 </div>
                 {% endif %}
                 {% if order.remarks %}<div class="flex justify-between"><dt class="text-slate-400">Remarks</dt><dd class="text-slate-800">{{ order.remarks }}</dd></div>{% endif %}
@@ -61,10 +61,10 @@
         <div class="card p-6">
             <h2 class="text-sm font-semibold text-slate-800 mb-3">Price Breakdown</h2>
             <dl class="space-y-2 text-sm">
-                <div class="flex justify-between"><dt class="text-slate-400">Shipping Fee</dt><dd class="font-mono">₦{{ order.shipping_fee }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-400">Service Charge</dt><dd class="font-mono">₦{{ order.service_charge }}</dd></div>
-                <div class="flex justify-between"><dt class="text-slate-400">VAT</dt><dd class="font-mono">₦{{ order.vat }}</dd></div>
-                <div class="flex justify-between border-t border-slate-100 pt-2 mt-2"><dt class="font-semibold text-slate-800">Total</dt><dd class="font-mono font-bold text-slate-900">₦{{ order.total }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">Shipping Fee</dt><dd class="font-mono">&#8358;{{ order.shipping_fee }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">Service Charge</dt><dd class="font-mono">&#8358;{{ order.service_charge }}</dd></div>
+                <div class="flex justify-between"><dt class="text-slate-400">VAT</dt><dd class="font-mono">&#8358;{{ order.vat }}</dd></div>
+                <div class="flex justify-between border-t border-slate-100 pt-2 mt-2"><dt class="font-semibold text-slate-800">Total</dt><dd class="font-mono font-bold text-slate-900">&#8358;{{ order.total }}</dd></div>
             </dl>
         </div>
         {% comment %}Whoever is running the last leg needs to reach the customer
@@ -87,12 +87,12 @@
                 <div class="flex justify-between gap-4">
                     <dt class="text-slate-400 shrink-0">Email</dt>
                     <dd class="text-right text-slate-800 break-all">
-                        {% if order.user.email %}<a href="mailto:{{ order.user.email }}" class="hover:text-emerald-600">{{ order.user.email }}</a>{% else %}—{% endif %}
+                        {% if order.user.email %}<a href="mailto:{{ order.user.email }}" class="hover:text-emerald-600">{{ order.user.email }}</a>{% else %}&#8212;{% endif %}
                     </dd>
                 </div>
                 <div class="flex justify-between gap-4">
                     <dt class="text-slate-400 shrink-0">Address</dt>
-                    <dd class="text-right text-slate-800">{{ order.address.contact_address|default:"—" }}</dd>
+                    <dd class="text-right text-slate-800">{{ order.address.contact_address|default:"-" }}</dd>
                 </div>
                 {% if order.address.lga or order.address.state %}
                 <div class="flex justify-between gap-4">
@@ -141,24 +141,24 @@
                             {% if item.product %}<div class="text-xs font-normal text-slate-400">for {{ item.product.name }}</div>{% endif %}
                             {% elif item.product %}
                             {{ item.product.name }}
-                            {% else %}—{% endif %}
+                            {% else %}&#8212;{% endif %}
                         </td>
                         <td>{{ item.quantity }}{% if item.unit %} {{ item.unit }}{% endif %}</td>
-                        <td class="font-mono">₦{{ item.price }}</td>
-                        <td class="font-mono">₦{{ item.amount }}</td>
+                        <td class="font-mono">&#8358;{{ item.price }}</td>
+                        <td class="font-mono">&#8358;{{ item.amount }}</td>
                         <td>
                             {% if item.market %}
                             {{ item.market.name }}
                             {% elif item.ingredient %}
                             <span class="badge-warning">Not routed</span>
                             {% else %}
-                            <span class="text-slate-400" title="Product lines are not dispatched to markets">—</span>
+                            <span class="text-slate-400" title="Product lines are not dispatched to markets">&#8212;</span>
                             {% endif %}
                         </td>
                         <td class="text-slate-500 text-xs">
                             {% if item.pending_offers %}{{ item.pending_offers }} awaiting reply
                             {% elif item.total_offers %}{{ item.total_offers }} offered, none pending
-                            {% else %}<span class="text-slate-400">—</span>{% endif %}
+                            {% else %}<span class="text-slate-400">&#8212;</span>{% endif %}
                         </td>
                         <td class="text-slate-500">{{ item.vendor.name|default:"Unassigned" }}</td>
                         <td><span class="{{ item.status|item_badge }}" data-item-status="{{ item.id }}" data-status-value="{{ item.status }}">{{ item.status|status_label }}</span></td>

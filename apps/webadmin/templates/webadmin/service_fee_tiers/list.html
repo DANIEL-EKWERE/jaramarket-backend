@@ -18,13 +18,13 @@
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>Min Amount (₦)</th><th>Max Amount (₦)</th><th>Fee</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>Min Amount (&#8358;)</th><th>Max Amount (&#8358;)</th><th>Fee</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for t in page %}
                     <tr>
-                        <td class="font-mono">₦{{ t.min_amount }}</td>
-                        <td class="font-mono">{% if t.max_amount %}₦{{ t.max_amount }}{% else %}No limit{% endif %}</td>
-                        <td><span class="inline-block px-3 py-1 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{% if t.fee_type == "flat" %}Flat ₦{{ t.value }}{% else %}{{ t.value }}%{% endif %}</span></td>
+                        <td class="font-mono">&#8358;{{ t.min_amount }}</td>
+                        <td class="font-mono">{% if t.max_amount %}&#8358;{{ t.max_amount }}{% else %}No limit{% endif %}</td>
+                        <td><span class="inline-block px-3 py-1 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">{% if t.fee_type == "flat" %}Flat &#8358;{{ t.value }}{% else %}{{ t.value }}%{% endif %}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{% url 'webadmin:service_fee_tier_update' t.id %}" class="btn-edit">Edit</a>

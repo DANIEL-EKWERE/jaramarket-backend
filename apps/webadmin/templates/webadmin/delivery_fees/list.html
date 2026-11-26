@@ -19,7 +19,7 @@
         <form method="post" action="{% url 'webadmin:delivery_fee_default' %}" class="flex items-end gap-4 flex-wrap">
             {% csrf_token %}
             <div class="flex-1 min-w-[220px]">
-                <label>Fallback Fee (₦)</label>
+                <label>Fallback Fee (&#8358;)</label>
                 <input type="number" step="0.01" name="default_fee" value="{{ default_fee }}">
                 <p class="text-xs text-slate-400 mt-1">Charged when a customer's location has no rule below.</p>
             </div>
@@ -30,12 +30,12 @@
     <div class="card overflow-hidden">
         <div class="overflow-x-auto">
             <table class="admin-table w-full">
-                <thead><tr><th>State</th><th>LGA</th><th>Scope</th><th>Fee (₦)</th><th class="text-right">Actions</th></tr></thead>
+                <thead><tr><th>State</th><th>LGA</th><th>Scope</th><th>Fee (&#8358;)</th><th class="text-right">Actions</th></tr></thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for f in page %}
                     <tr>
                         <td class="font-medium text-slate-700">{{ f.state.name }}</td>
-                        <td>{% if f.lga %}{{ f.lga.name }}{% else %}<span class="text-slate-400">—</span>{% endif %}</td>
+                        <td>{% if f.lga %}{{ f.lga.name }}{% else %}<span class="text-slate-400">&#8212;</span>{% endif %}</td>
                         <td>
                             {% if f.lga %}
                             <span class="badge-info">LGA</span>
@@ -43,7 +43,7 @@
                             <span class="badge-warning">Entire state</span>
                             {% endif %}
                         </td>
-                        <td><span class="inline-block px-3 py-1 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">₦{{ f.fee }}</span></td>
+                        <td><span class="inline-block px-3 py-1 rounded-lg text-sm font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">&#8358;{{ f.fee }}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
                                 <a href="{% url 'webadmin:delivery_fee_update' f.id %}" class="btn-edit">Edit</a>
@@ -54,7 +54,7 @@
                         </td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="5" class="text-center text-slate-400 py-12">No location rules yet — the fallback fee above applies everywhere.</td></tr>
+                    <tr><td colspan="5" class="text-center text-slate-400 py-12">No location rules yet &#8212; the fallback fee above applies everywhere.</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

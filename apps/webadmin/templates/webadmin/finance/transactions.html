@@ -30,11 +30,11 @@
                 {% for t in page %}
                     <tr>
                         <td class="font-mono text-xs text-slate-500">{{ t.reference }}</td>
-                        <td>{% if t.owner %}<span class="font-medium text-slate-800">{{ t.owner.name }}</span><br><span class="text-slate-400 text-xs">{{ t.owner.email }}</span>{% else %}—{% endif %}</td>
+                        <td>{% if t.owner %}<span class="font-medium text-slate-800">{{ t.owner.name }}</span><br><span class="text-slate-400 text-xs">{{ t.owner.email }}</span>{% else %}&#8212;{% endif %}</td>
                         <td><span class="badge-{% if t.transaction_type == 'credit' %}success{% else %}danger{% endif %}">{{ t.transaction_type }}</span></td>
-                        <td class="font-mono">₦{{ t.amount_major }}</td>
-                        <td class="font-mono text-xs text-slate-500">₦{{ t.old_balance }} → ₦{{ t.new_balance }}</td>
-                        <td class="text-slate-500">{{ t.status|default:"—" }}</td>
+                        <td class="font-mono">&#8358;{{ t.amount_major }}</td>
+                        <td class="font-mono text-xs text-slate-500">&#8358;{{ t.old_balance }} &#8594; &#8358;{{ t.new_balance }}</td>
+                        <td class="text-slate-500">{{ t.status|default:"-" }}</td>
                         <td class="text-slate-400 text-xs">{{ t.created_at }}</td>
                     </tr>
                 {% empty %}

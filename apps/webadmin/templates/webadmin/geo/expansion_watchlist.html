@@ -43,19 +43,19 @@
                     <tr>
                         <td>
                             <div class="font-medium text-slate-800">
-                                {{ r.lga.name|default:"—" }}{% if r.lga and r.state %}, {% endif %}{{ r.state.name|default:"" }}
+                                {{ r.lga.name|default:"-" }}{% if r.lga and r.state %}, {% endif %}{{ r.state.name|default:"" }}
                             </div>
                             {% comment %}A state already covered but still showing up means the
                                customer's LGA sits outside the narrower rows -- worth knowing
                                before reading the demand as a new market.{% endcomment %}
                             {% if r.already_covered %}
-                            <div class="text-xs text-amber-600 mt-0.5">State already has a service area — this LGA isn't in it</div>
+                            <div class="text-xs text-amber-600 mt-0.5">State already has a service area &#8212; this LGA isn't in it</div>
                             {% endif %}
                         </td>
-                        <td class="text-xs text-slate-500">{{ r.city|default:"—"|truncatechars:48 }}</td>
+                        <td class="text-xs text-slate-500">{{ r.city|default:"-"|truncatechars:48 }}</td>
                         <td class="text-center"><span class="badge-warning">{{ r.unique_users }}</span></td>
                         <td class="text-center text-slate-600">{{ r.request_count }}</td>
-                        <td class="text-xs text-slate-500">{{ r.last_requested_at|date:"M j, Y H:i"|default:"—" }}</td>
+                        <td class="text-xs text-slate-500">{{ r.last_requested_at|date:"M j, Y H:i"|default:"-" }}</td>
                     </tr>
                 {% empty %}
                     <tr><td colspan="5" class="text-center text-slate-400 py-12">Nobody has been turned away yet.</td></tr>

@@ -22,11 +22,11 @@
                 <tbody class="divide-y divide-slate-50">
                 {% for r in page %}
                     <tr>
-                        <td class="font-medium text-slate-800">{{ r.user.name|default:"—" }}</td>
-                        <td class="text-slate-500">{{ r.user.email|default:"—" }}</td>
-                        <td class="text-slate-500">{{ r.phone|default:"—" }}</td>
-                        <td class="text-slate-500">{{ r.state.name|default:"—" }}</td>
-                        <td class="text-slate-500">{{ r.lga|default:"—" }}</td>
+                        <td class="font-medium text-slate-800">{{ r.user.name|default:"-" }}</td>
+                        <td class="text-slate-500">{{ r.user.email|default:"-" }}</td>
+                        <td class="text-slate-500">{{ r.phone|default:"-" }}</td>
+                        <td class="text-slate-500">{{ r.state.name|default:"-" }}</td>
+                        <td class="text-slate-500">{{ r.lga|default:"-" }}</td>
                         <td><span class="badge-{% if r.is_active %}success{% else %}danger{% endif %}">{% if r.is_active %}Active{% else %}Inactive{% endif %}</span></td>
                         <td class="text-right">
                             <div class="flex items-center justify-end gap-2">
